@@ -232,6 +232,8 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
 int main ()
 {
     PrintEndpointNames () ;
+    M10Decoder m10Decoder ;
+    RecordAudioStream ( &m10Decoder ) ;
     return 0;
 }
 

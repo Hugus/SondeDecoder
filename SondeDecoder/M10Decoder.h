@@ -11,5 +11,8 @@ public:
     HRESULT SetFormat ( WAVEFORMATEX *pwfx );
     HRESULT CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone );
 
+private:
+    WORD m_bitsPerSample ;
+    DWORD m_samplesPerSec ;
 };
 
