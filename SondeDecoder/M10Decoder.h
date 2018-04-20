@@ -80,6 +80,11 @@ private:
     /// @returns 1 if header found, -1 if found but inverted, 0 if not found
     int IsThisAHeader () ;
 
+    /// Compute frame CRC
+    int checkM10 ( uint8_t *msg, int len ) ;
+    /// Sub function used by checkM10
+    int update_checkM10 ( int c, uint8_t b ) ;
+
 private:
     WORD m_bitsPerSample ;
     DWORD m_samplePerSec ;

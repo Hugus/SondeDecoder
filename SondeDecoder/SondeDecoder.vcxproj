@@ -143,6 +143,7 @@
   <ItemGroup>
     <ClInclude Include="GPS.h" />
     <ClInclude Include="M10Decoder.h" />
+    <ClInclude Include="ShibauraSensor.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Utils.h" />
@@ -150,6 +151,7 @@
   <ItemGroup>
     <ClCompile Include="GPS.cpp" />
     <ClCompile Include="M10Decoder.cpp" />
+    <ClCompile Include="ShibauraSensor.cpp" />
     <ClCompile Include="SondeDecoder.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
