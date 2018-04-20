@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "GPS.h"
+#include "Utils.h"
 #include <math.h>
 
 
@@ -114,26 +115,9 @@ int GPS::get_GPSlat ( char * frame_bytes, uint32_t posGpsLat, Date & date  ) {
     return 0;
 }
 
-int GPS::get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) {
-    int i;
-    unsigned byte;
-    uint8_t gpslon_bytes[4];
-    int gpslon;
-    double lon;
+void GPS::get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) {
 
-    for ( i = 0; i < 4; i++ ) {
-        byte = frame_bytes[posGpsLon + i];
-        gpslon_bytes[i] = byte;
-    }
-
-    gpslon = 0;
-    for ( i = 0; i < 4; i++ ) {
-        gpslon |= gpslon_bytes[i] << ( 8 * ( 3 - i ) );
-    }
-    lon = gpslon / B60B60;
-    date.lon = lon;
-
-    return 0;
+    date.lon = getInt32 ( frame_bytes, posGpsLon ) / B60B60;
 }
 
 int GPS::get_GPSalt ( char * frame_bytes, uint32_t posGpsAlt, Date & date ) {

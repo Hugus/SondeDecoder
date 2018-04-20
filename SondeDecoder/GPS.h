@@ -23,7 +23,7 @@ public:
     static int get_GPSweek ( char * frame_bytes, uint32_t posGpsWeek, Date & date ) ;
     static int get_GPStime ( char * frame_bytes, uint32_t posGpsTow, Date & date ) ;
     static int get_GPSlat ( char * frame_bytes, uint32_t posGpsLat, Date & date ) ;
-    static int get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) ;
+    static void get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) ;
     static int get_GPSalt ( char * frame_bytes, uint32_t posGpsAlt, Date & date ) ;
     static int get_GPSvel (
             char * frame_bytes,

@@ -82,3 +82,19 @@ int dpsk_bpm ( char* frame_rawbits, char *frame_bits, int len ) {
 
     return bit0;
 }
+
+int32_t getInt32 ( char *frame_bytes, uint32_t position )
+{
+
+    uint8_t outputArray[4];
+    for ( unsigned int i = 0; i < 4; i++ ) {
+        outputArray[i] = frame_bytes[position + i];;
+    }
+
+    int32_t result = 0 ;
+    for ( unsigned int i = 0; i < 4; i++ ) {
+        result |= outputArray[i] << ( 8 * ( 3 - i ) );
+    }
+
+    return result ;
+}
