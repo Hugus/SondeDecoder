@@ -1,7 +1,10 @@
 #include "stdafx.h"
 #include "GPS.h"
 #include "Utils.h"
-#include <math.h>
+#define _USE_MATH_DEFINES
+#include <cmath> 
+
+
 
 
 GPS::GPS ()
@@ -39,7 +42,7 @@ void GPS::Gps2Date ( long GpsWeek, long GpsSeconds, int *Year, int *Month, int *
     *Year = 100 * ( C - 49 ) + Y + J;
 }
 
-int GPS::get_GPSweek ( char * frame_bytes, uint32_t posGpsWeek, Date & date ) {
+int GPS::get_GPSweek ( uint8_t * frame_bytes, uint32_t posGpsWeek, Date & date ) {
     int i;
     unsigned byte;
     uint8_t gpsweek_bytes[2];
@@ -59,7 +62,7 @@ int GPS::get_GPSweek ( char * frame_bytes, uint32_t posGpsWeek, Date & date ) {
 }
 
 
-int GPS::get_GPStime ( char * frame_bytes, uint32_t posGpsTow, Date & date ) {
+int GPS::get_GPStime ( uint8_t * frame_bytes, uint32_t posGpsTow, Date & date ) {
 
     int gpstime = getInt32 ( frame_bytes, posGpsTow ) ;
     //ms = gpstime % 1000;
@@ -80,17 +83,17 @@ int GPS::get_GPStime ( char * frame_bytes, uint32_t posGpsTow, Date & date ) {
 
 double B60B60 = 0xB60B60;  // 2^32/360 = 0xB60B60.xxx
 
-int GPS::get_GPSlat ( char * frame_bytes, uint32_t posGpsLat, Date & date  ) 
+void GPS::get_GPSlat ( uint8_t * frame_bytes, uint32_t posGpsLat, Date & date  )
 {
     date.lat = getInt32 ( frame_bytes, posGpsLat ) / B60B60;
 }
 
-void GPS::get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) 
+void GPS::get_GPSlon ( uint8_t * frame_bytes, uint32_t posGpsLon, Date & date )
 {
     date.lon = getInt32 ( frame_bytes, posGpsLon ) / B60B60;
 }
 
-int GPS::get_GPSalt ( char * frame_bytes, uint32_t posGpsAlt, Date & date ) 
+void GPS::get_GPSalt ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date )
 {
     date.alt = getInt32 ( frame_bytes, posGpsAlt ) / 1000.0;
 }
@@ -98,8 +101,8 @@ int GPS::get_GPSalt ( char * frame_bytes, uint32_t posGpsAlt, Date & date )
 int 
 GPS::get_GPSvel 
 ( 
-    char * frame_bytes, 
-    uint32_t posGpsVel, 
+    uint8_t * frame_bytes,
+    uint32_t posGpsVelE,
     uint32_t posGpsVelN,
     uint32_t posGpsVelU, 
     Date & date 
@@ -113,7 +116,7 @@ GPS::get_GPSvel
     const double ms2kn100 = 2e2;  // m/s -> knots: 1 m/s = 3.6/1.852 kn = 1.94 kn
 
     for ( i = 0; i < 2; i++ ) {
-        byte = frame_bytes[posGpsVel + i];
+        byte = frame_bytes[posGpsVelE + i];
         gpsVel_bytes[i] = byte;
     }
     vel16 = gpsVel_bytes[0] << 8 | gpsVel_bytes[1];
@@ -149,7 +152,7 @@ GPS::get_GPSvel
     return 0;
 }
 
-int GPS::get_SN ( char * frame_bytes, uint32_t posGpsAlt, Date & date  ) {
+int GPS::get_SN ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date  ) {
     int i;
     unsigned byte;
     uint8_t sn_bytes[5];

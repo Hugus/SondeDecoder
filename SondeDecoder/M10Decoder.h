@@ -125,5 +125,7 @@ private:
     int m_bufPos ;
 
     int m_auxlen = 0; // 0 .. 0x76-0x64
+
+    bool m_isHeaderFound ;
 };
 

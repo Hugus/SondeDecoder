@@ -17,7 +17,7 @@ ShibauraSensor::~ShibauraSensor ()
 // Temperatur Sensor
 // NTC-Thermistor Shibaura PB5-41E
 //
-float ShibauraSensor::get_Temp ( int csOK, char * frame_bytes, int verbose ) {
+float ShibauraSensor::get_Temp ( int csOK, uint8_t * frame_bytes, int verbose ) {
     // NTC-Thermistor Shibaura PB5-41E
     // T00 = 273.15 +  0.0 , R00 = 15e3
     // T25 = 273.15 + 25.0 , R25 = 5.369e3
@@ -90,7 +90,7 @@ float ShibauraSensor::get_Temp ( int csOK, char * frame_bytes, int verbose ) {
     return  T - 273.15; // Celsius
 }
 
-float ShibauraSensor::get_Tntc2 ( int csOK, char * frame_bytes ) {
+float ShibauraSensor::get_Tntc2 ( int csOK, uint8_t * frame_bytes ) {
     // SMD ntc
     float Rs = 22.1e3;          // P5.6=Vcc
                                 //  float R25 = 2.2e3;
@@ -122,10 +122,10 @@ float ShibauraSensor::get_Tntc2 ( int csOK, char * frame_bytes ) {
 #define LN2         0.693147181
 #define ADR_108A    1000.0       // 0x3E8=1000
 
-float ShibauraSensor::get_count_RH ( char * frame_bytes  ) {  // capture 1000 rising edges
+float ShibauraSensor::get_count_RH ( uint8_t * frame_bytes  ) {  // capture 1000 rising edges
     uint32_t TBCCR1_1000 = frame_bytes[0x35] | ( frame_bytes[0x36] << 8 ) | ( frame_bytes[0x37] << 16 );
     return TBCCR1_1000 / ADR_108A;
 }
-float ShibauraSensor::get_TLC555freq ( char * frame_bytes  ) {
-    return FREQ_CAPCLK / get_count_RH ();
+float ShibauraSensor::get_TLC555freq ( uint8_t * frame_bytes  ) {
+    return FREQ_CAPCLK / get_count_RH ( frame_bytes  );
 }

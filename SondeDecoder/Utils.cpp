@@ -85,7 +85,7 @@ int dpsk_bpm ( char* frame_rawbits, char *frame_bits, int len ) {
     return bit0;
 }
 
-int32_t getInt32 ( char *frame_bytes, uint32_t position )
+int32_t getInt32 ( uint8_t *frame_bytes, uint32_t position )
 {
 
     uint8_t outputArray[4];
