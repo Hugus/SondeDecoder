@@ -89,3 +89,43 @@ float ShibauraSensor::get_Temp ( int csOK, char * frame_bytes, int verbose ) {
 
     return  T - 273.15; // Celsius
 }
+
+float ShibauraSensor::get_Tntc2 ( int csOK, char * frame_bytes ) {
+    // SMD ntc
+    float Rs = 22.1e3;          // P5.6=Vcc
+                                //  float R25 = 2.2e3;
+                                //  float b = 3650.0;           // B/Kelvin
+                                //  float T25 = 25.0 + 273.15;  // T0=25C, R0=R25=5k
+                                // -> Steinhart–Hart coefficients (polyfit):
+    float p0 = 4.42606809e-03,
+        p1 = -6.58184309e-04,
+        p2 = 8.95735557e-05,
+        p3 = -2.84347503e-06;
+    float T = 0.0;              // T/Kelvin
+    uint16_t ADC_ntc2;            // ADC12 P6.4(A4)
+    float x, R;
+    if ( csOK )
+    {
+        ADC_ntc2 = ( frame_bytes[0x5A] << 8 ) | frame_bytes[0x59];
+        x = ( 4095.0 - ADC_ntc2 ) / ADC_ntc2;  // (Vcc-Vout)/Vout
+        R = Rs / x;
+        //if (R > 0)  T = 1/(1/T25 + 1/b * log(R/R25));
+        if ( R > 0 )  T = 1 / ( p0 + p1*log ( R ) + p2*log ( R )*log ( R ) + p3*log ( R )*log ( R )*log ( R ) );
+    }
+    return T - 273.15;
+}
+
+// Humidity Sensor
+// U.P.S.I.
+//
+#define FREQ_CAPCLK (8e6/2)      // 8 MHz XT2 crystal, InputDivider IDx=01 (/2)
+#define LN2         0.693147181
+#define ADR_108A    1000.0       // 0x3E8=1000
+
+float ShibauraSensor::get_count_RH ( char * frame_bytes  ) {  // capture 1000 rising edges
+    uint32_t TBCCR1_1000 = frame_bytes[0x35] | ( frame_bytes[0x36] << 8 ) | ( frame_bytes[0x37] << 16 );
+    return TBCCR1_1000 / ADR_108A;
+}
+float ShibauraSensor::get_TLC555freq ( char * frame_bytes  ) {
+    return FREQ_CAPCLK / get_count_RH ();
+}

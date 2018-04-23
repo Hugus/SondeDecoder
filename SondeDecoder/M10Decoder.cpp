@@ -2,6 +2,7 @@
 #include "M10Decoder.h"
 #include "GPS.h"
 #include "Utils.h"
+#include "ShibauraSensor.h"
 #include <iostream>
 
 /*
@@ -26,6 +27,7 @@ M10Decoder::M10Decoder ()
     , m_bitStart( false )
     , m_sCount( 0 )
     , m_bufPos( -1 )
+    , m_auxlen( 0 )
 {
 }
 
@@ -226,7 +228,7 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 //"011001000100100100001001"; // M10-dop: 64 49 09
 const char header[] = "10011001100110010100110010011001";
 
-// int auxlen = 0; // 0 .. 0x76-0x64
+// int m_auxlen = 0; // 0 .. 0x76-0x64
 
 
 void M10Decoder::incrementBufferIndex () {
@@ -382,8 +384,6 @@ int M10Decoder::checkM10 ( uint8_t *msg, int len ) {
     return cs & 0xFFFF;
 }
 
-// TODO I AM HERE
-
 
 /* -------------------------------------------------------------------------- */
 
@@ -429,77 +429,19 @@ frame[0x5F]: adr_1084h (SN)
 frame[0x60]: adr_1080h (SN)
 frame[0x61]: adr_1081h (SN)
 */
-float get_Tntc2 ( int csOK ) {
-    // SMD ntc
-    float Rs = 22.1e3;          // P5.6=Vcc
-                                //  float R25 = 2.2e3;
-                                //  float b = 3650.0;           // B/Kelvin
-                                //  float T25 = 25.0 + 273.15;  // T0=25C, R0=R25=5k
-                                // -> Steinhart–Hart coefficients (polyfit):
-    float p0 = 4.42606809e-03,
-        p1 = -6.58184309e-04,
-        p2 = 8.95735557e-05,
-        p3 = -2.84347503e-06;
-    float T = 0.0;              // T/Kelvin
-    ui16_t ADC_ntc2;            // ADC12 P6.4(A4)
-    float x, R;
-    if ( csOK )
-    {
-        ADC_ntc2 = ( frame_bytes[0x5A] << 8 ) | frame_bytes[0x59];
-        x = ( 4095.0 - ADC_ntc2 ) / ADC_ntc2;  // (Vcc-Vout)/Vout
-        R = Rs / x;
-        //if (R > 0)  T = 1/(1/T25 + 1/b * log(R/R25));
-        if ( R > 0 )  T = 1 / ( p0 + p1*log ( R ) + p2*log ( R )*log ( R ) + p3*log ( R )*log ( R )*log ( R ) );
-    }
-    return T - 273.15;
-}
 
-// Humidity Sensor
-// U.P.S.I.
-//
-#define FREQ_CAPCLK (8e6/2)      // 8 MHz XT2 crystal, InputDivider IDx=01 (/2)
-#define LN2         0.693147181
-#define ADR_108A    1000.0       // 0x3E8=1000
-
-float get_count_RH () {  // capture 1000 rising edges
-    ui32_t TBCCR1_1000 = frame_bytes[0x35] | ( frame_bytes[0x36] << 8 ) | ( frame_bytes[0x37] << 16 );
-    return TBCCR1_1000 / ADR_108A;
-}
-float get_TLC555freq () {
-    return FREQ_CAPCLK / get_count_RH ();
-}
-/*
-double get_C_RH() {  // TLC555 astable: R_A=3.65k, R_B=338k
-double R_B = 338e3;
-double R_A = 3.65e3;
-double C_RH = 1/get_TLC555freq() / (LN2 * (R_A + 2*R_B));
-return C_RH;
-}
-double get_RH(int csOK) {
-// U.P.S.I.
-// C_RH/C_55 = 0.8955 + 0.002*RH , T=20C
-// C_RH = C_RH(RH,T) , RH = RH(C_RH,T)
-// C_RH/C_55 approx.eq. count_RH/count_ref
-// c55=270pF? diff=C_55-c55, T=20C
-ui32_t c = frame_bytes[0x32] | (frame_bytes[0x33]<<8) | (frame_bytes[0x34]<<16); // CalRef 55%RH , T=20C ?
-double count_ref = c / ADR_108A; // CalRef 55%RH , T=20C ?
-double C_RH = get_C_RH();
-double T = get_Tntc2(csOK);
-return 0;
-}
-*/
 /* -------------------------------------------------------------------------- */
 char weekday[7][3] = { "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa" };
 
-int print_pos ( int csOK ) {
+int M10Decoder::print_pos ( int csOK ) {
     int err;
 
     err = 0;
-    err |= get_GPSweek ();
-    err |= get_GPStime ();
-    err |= get_GPSlat ();
-    err |= get_GPSlon ();
-    err |= get_GPSalt ();
+    err |= GPS::get_GPSweek ( frame_bytes, pos_GPSweek, m_date);
+    err |= GPS::get_GPStime ( frame_bytes, pos_GPSTOW, m_date );
+    err |= GPS::get_GPSlat ( frame_bytes, pos_GPSlat, m_date );
+    err |= GPS::get_GPSlon ( frame_bytes, pos_GPSlon, m_date );
+    err |= GPS::get_GPSalt ( frame_bytes, pos_GPSalt, m_date );
 
     if ( !err ) {
 
@@ -515,13 +457,13 @@ int print_pos ( int csOK ) {
             fprintf ( stdout, " lon: "col_GPSlon"%.6f"col_TXT" ", m_date.lon );
             fprintf ( stdout, " alt: "col_GPSalt"%.2f"col_TXT" ", m_date.alt );
             if ( m_configuration.verbose ) {
-                err |= get_GPSvel ();
+                err |= GPS::get_GPSvel ();
                 if ( !err ) {
                     //if (m_configuration.verbose == 2) fprintf(stdout, "  "col_GPSvel"(%.1f , %.1f : %.1f)"col_TXT" ", m_date.vx, m_date.vy, m_date.vD2);
                     fprintf ( stdout, "  vH: "col_GPSvel"%.1f"col_TXT"  D: "col_GPSvel"%.1f"col_TXT"°  vV: "col_GPSvel"%.1f"col_TXT" ", m_date.vH, m_date.vD, m_date.vV );
                 }
                 if ( m_configuration.verbose >= 2 ) {
-                    get_SN ();
+                    GPS::get_SN ();
                     fprintf ( stdout, "  SN: "col_SN"%s"col_TXT, m_date.SN );
                 }
                 if ( m_configuration.verbose >= 2 ) {
@@ -534,8 +476,8 @@ int print_pos ( int csOK ) {
                 float t = ShibauraSensor::get_Temp ( csOK, frame_bytes, m_configuration.verbose );
                 if ( t > -270.0 ) fprintf ( stdout, "  T=%.1fC ", t );
                 if ( m_configuration.verbose >= 3 ) {
-                    float t2 = get_Tntc2 ( csOK );
-                    float fq555 = get_TLC555freq ();
+                    float t2 = ShibauraSensor::get_Tntc2 ( csOK );
+                    float fq555 = ShibauraSensor::get_TLC555freq ();
                     if ( t2 > -270.0 ) fprintf ( stdout, " (T2:%.1fC) (%.3fkHz) ", t2, fq555 / 1e3 );
                 }
             }
@@ -550,13 +492,13 @@ int print_pos ( int csOK ) {
             fprintf ( stdout, " lon: %.6f ", m_date.lon );
             fprintf ( stdout, " alt: %.2f ", m_date.alt );
             if ( m_configuration.verbose ) {
-                err |= get_GPSvel ();
+                err |= GPS::get_GPSvel ();
                 if ( !err ) {
                     //if (m_configuration.verbose == 2) fprintf(stdout, "  (%.1f , %.1f : %.1f°) ", m_date.vx, m_date.vy, m_date.vD2);
                     fprintf ( stdout, "  vH: %.1f  D: %.1f°  vV: %.1f ", m_date.vH, m_date.vD, m_date.vV );
                 }
                 if ( m_configuration.verbose >= 2 ) {
-                    get_SN ();
+                    GPS::get_SN ();
                     fprintf ( stdout, "  SN: %s", m_date.SN );
                 }
                 if ( m_configuration.verbose >= 2 ) {
@@ -565,11 +507,11 @@ int print_pos ( int csOK ) {
                 }
             }
             if ( m_configuration.ptu ) {
-                float t = get_Temp ( csOK );
+                float t = ShibauraSensor::get_Temp ( csOK );
                 if ( t > -270.0 ) fprintf ( stdout, "  T=%.1fC ", t );
                 if ( m_configuration.verbose >= 3 ) {
-                    float t2 = get_Tntc2 ( csOK );
-                    float fq555 = get_TLC555freq ();
+                    float t2 = ShibauraSensor::get_Tntc2 ( csOK );
+                    float fq555 = ShibauraSensor::get_TLC555freq ();
                     if ( t2 > -270.0 ) fprintf ( stdout, " (T2:%.1fC) (%.3fkHz) ", t2, fq555 / 1e3 );
                 }
             }
@@ -581,7 +523,7 @@ int print_pos ( int csOK ) {
     return err;
 }
 
-void print_frame ( int pos ) {
+void M10Decoder::print_frame ( int pos ) {
     int i;
     uint8_t byte;
     int cs1, cs2;
@@ -592,20 +534,20 @@ void print_frame ( int pos ) {
     }
     bits2bytes ( frame_bits, frame_bytes );
     flen = frame_bytes[0];
-    if ( flen == stdFLEN ) auxlen = 0;
+    if ( flen == stdFLEN ) m_auxlen = 0;
     else {
-        auxlen = flen - stdFLEN;
-        if ( auxlen < 0 || auxlen > AUX_LEN ) auxlen = 0;
+        m_auxlen = flen - stdFLEN;
+        if ( m_auxlen < 0 || m_auxlen > AUX_LEN ) m_auxlen = 0;
     }
 
-    cs1 = ( frame_bytes[pos_Check + auxlen] << 8 ) | frame_bytes[pos_Check + auxlen + 1];
-    cs2 = checkM10 ( frame_bytes, pos_Check + auxlen );
+    cs1 = ( frame_bytes[pos_Check + m_auxlen] << 8 ) | frame_bytes[pos_Check + m_auxlen + 1];
+    cs2 = checkM10 ( frame_bytes, pos_Check + m_auxlen );
 
     if ( m_configuration.raw ) {
 
         if ( m_configuration.color  &&  frame_bytes[1] != 0x49 ) {
             fprintf ( stdout, col_FRTXT );
-            for ( i = 0; i < FRAME_LEN + auxlen; i++ ) {
+            for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
                 byte = frame_bytes[i];
                 if ( ( i >= pos_GPSTOW ) && ( i < pos_GPSTOW + 4 ) )   fprintf ( stdout, col_GPSTOW );
                 if ( ( i >= pos_GPSlat ) && ( i < pos_GPSlat + 4 ) )   fprintf ( stdout, col_GPSlat );
@@ -614,7 +556,7 @@ void print_frame ( int pos ) {
                 if ( ( i >= pos_GPSweek ) && ( i < pos_GPSweek + 2 ) )  fprintf ( stdout, col_GPSweek );
                 if ( ( i >= pos_GPSvE ) && ( i < pos_GPSvE + 6 ) )    fprintf ( stdout, col_GPSvel );
                 if ( ( i >= pos_SN ) && ( i < pos_SN + 5 ) )       fprintf ( stdout, col_SN );
-                if ( ( i >= pos_Check + auxlen ) && ( i < pos_Check + auxlen + 2 ) )  fprintf ( stdout, col_Check );
+                if ( ( i >= pos_Check + m_auxlen ) && ( i < pos_Check + m_auxlen + 2 ) )  fprintf ( stdout, col_Check );
                 fprintf ( stdout, "%02x", byte );
                 fprintf ( stdout, col_FRTXT );
             }
@@ -626,7 +568,7 @@ void print_frame ( int pos ) {
             fprintf ( stdout, ANSI_COLOR_RESET"\n" );
         }
         else {
-            for ( i = 0; i < FRAME_LEN + auxlen; i++ ) {
+            for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
                 byte = frame_bytes[i];
                 fprintf ( stdout, "%02x", byte );
             }
@@ -640,7 +582,7 @@ void print_frame ( int pos ) {
     }
     else if ( frame_bytes[1] == 0x49 ) {
         if ( m_configuration.verbose == 3 ) {
-            for ( i = 0; i < FRAME_LEN + auxlen; i++ ) {
+            for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
                 byte = frame_bytes[i];
                 fprintf ( stdout, "%02x", byte );
             }

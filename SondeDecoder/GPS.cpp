@@ -60,26 +60,13 @@ int GPS::get_GPSweek ( char * frame_bytes, uint32_t posGpsWeek, Date & date ) {
 
 
 int GPS::get_GPStime ( char * frame_bytes, uint32_t posGpsTow, Date & date ) {
-    int i;
-    unsigned byte;
-    uint8_t gpstime_bytes[4];
-    int gpstime, day; // int ms;
 
-    for ( i = 0; i < 4; i++ ) {
-        byte = frame_bytes[posGpsTow + i];
-        gpstime_bytes[i] = byte;
-    }
-
-    gpstime = 0;
-    for ( i = 0; i < 4; i++ ) {
-        gpstime |= gpstime_bytes[i] << ( 8 * ( 3 - i ) );
-    }
-
+    int gpstime = getInt32 ( frame_bytes, posGpsTow ) ;
     //ms = gpstime % 1000;
     gpstime /= 1000;
     date.gpssec = gpstime;
 
-    day = gpstime / ( 24 * 3600 );
+    int day = gpstime / ( 24 * 3600 );
     gpstime %= ( 24 * 3600 );
 
     if ( ( day < 0 ) || ( day > 6 ) ) return -1;
@@ -93,53 +80,19 @@ int GPS::get_GPStime ( char * frame_bytes, uint32_t posGpsTow, Date & date ) {
 
 double B60B60 = 0xB60B60;  // 2^32/360 = 0xB60B60.xxx
 
-int GPS::get_GPSlat ( char * frame_bytes, uint32_t posGpsLat, Date & date  ) {
-    int i;
-    unsigned byte;
-    uint8_t gpslat_bytes[4];
-    int gpslat;
-    double lat;
-
-    for ( i = 0; i < 4; i++ ) {
-        byte = frame_bytes[posGpsLat + i];
-        gpslat_bytes[i] = byte;
-    }
-
-    gpslat = 0;
-    for ( i = 0; i < 4; i++ ) {
-        gpslat |= gpslat_bytes[i] << ( 8 * ( 3 - i ) );
-    }
-    lat = gpslat / B60B60;
-    date.lat = lat;
-
-    return 0;
+int GPS::get_GPSlat ( char * frame_bytes, uint32_t posGpsLat, Date & date  ) 
+{
+    date.lat = getInt32 ( frame_bytes, posGpsLat ) / B60B60;
 }
 
-void GPS::get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) {
-
+void GPS::get_GPSlon ( char * frame_bytes, uint32_t posGpsLon, Date & date ) 
+{
     date.lon = getInt32 ( frame_bytes, posGpsLon ) / B60B60;
 }
 
-int GPS::get_GPSalt ( char * frame_bytes, uint32_t posGpsAlt, Date & date ) {
-    int i;
-    unsigned byte;
-    uint8_t gpsalt_bytes[4];
-    int gpsalt;
-    double alt;
-
-    for ( i = 0; i < 4; i++ ) {
-        byte = frame_bytes[posGpsAlt + i];
-        gpsalt_bytes[i] = byte;
-    }
-
-    gpsalt = 0;
-    for ( i = 0; i < 4; i++ ) {
-        gpsalt |= gpsalt_bytes[i] << ( 8 * ( 3 - i ) );
-    }
-    alt = gpsalt / 1000.0;
-    date.alt = alt;
-
-    return 0;
+int GPS::get_GPSalt ( char * frame_bytes, uint32_t posGpsAlt, Date & date ) 
+{
+    date.alt = getInt32 ( frame_bytes, posGpsAlt ) / 1000.0;
 }
 
 int 

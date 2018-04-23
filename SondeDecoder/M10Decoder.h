@@ -56,6 +56,11 @@ public:
     HRESULT SetFormat ( WAVEFORMATEX *pwfx );
     HRESULT CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone );
 
+    int print_pos ( int csOK ) ;
+
+    void print_frame ( int pos ) ;
+
+
 private:
     /// Read a sample regardless of its size (8 or 16 bits)
     /// @returns signed sample as an integer
@@ -93,7 +98,7 @@ private:
     double m_samplePerBit ;
     double m_baudRate ;
 
-    Date_t m_date ;
+    Date m_date ;
 
     Configuration_t m_configuration ;
 
@@ -118,5 +123,7 @@ private:
     char buf[HEADLEN];
 
     int m_bufPos ;
+
+    int m_auxlen = 0; // 0 .. 0x76-0x64
 };
 

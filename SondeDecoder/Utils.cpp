@@ -1,9 +1,11 @@
 #include "stdafx.h"
 #include "Utils.h"
 
+#define BITS 8
+
 int bits2bytes ( char *bitstr, uint8_t *bytes, unsigned int size ) {
     int i, bit, d, byteval;
-    int bitpos, bytepos;
+    unsigned int bitpos, bytepos;
 
     bitpos = 0;
     bytepos = 0;
