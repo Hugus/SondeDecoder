@@ -3,6 +3,7 @@
 #include "GPS.h"
 #include "Utils.h"
 #include "ShibauraSensor.h"
+#include <Mmreg.h>
 #include <iostream>
 
 /*
@@ -29,6 +30,7 @@ M10Decoder::M10Decoder ()
     , m_bufPos( -1 )
     , m_auxlen( 0 )
     , m_isHeaderFound( false )
+    , m_sampleType( ST_INVALID )
 {
 }
 
@@ -43,6 +45,34 @@ HRESULT M10Decoder::SetFormat ( WAVEFORMATEX * pwfx )
     m_samplePerSec = pwfx->nSamplesPerSec ;
     m_nChannels = pwfx->nChannels ;
     m_samplePerBit = m_samplePerSec / m_baudRate;
+    if ( pwfx->wFormatTag == WAVE_FORMAT_PCM )
+    {
+        m_sampleType = ST_INT ;
+    }
+    else if ( pwfx->wFormatTag == WAVE_FORMAT_IEEE_FLOAT )
+    {
+        m_sampleType = ST_FLOAT ;
+    }
+    else if ( pwfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE )
+    {
+        WAVEFORMATEXTENSIBLE * extension = reinterpret_cast<WAVEFORMATEXTENSIBLE *>( pwfx ) ;
+        if ( extension->SubFormat == KSDATAFORMAT_SUBTYPE_PCM )
+        {
+            m_sampleType = ST_INT ;
+        }
+        else if ( extension->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT )
+        {
+            m_sampleType = ST_FLOAT ;
+        }
+        else
+        {
+            throw "Nap" ;
+        }
+    }
+    else
+    {
+        throw "Nip" ;
+    }
     return NOERROR;
 }
 
@@ -74,20 +104,18 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 #define pos_SN         0x5D  // 2+3 byte
 #define pos_Check     (stdFLEN-1)  // 2 byte
 
+int32_t max = 0 ;
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
     m_audioBuffer.currentPosition = 0 ;
     m_audioBuffer.pData = pData ;
-    m_audioBuffer.size = numFramesAvailable ;
+    m_audioBuffer.size = numFramesAvailable * m_bitsPerSample / 8 ;
 
-    for( unsigned int i =0 ; i < numFramesAvailable ; ++i )
-    {
-       // std::cout << (int)m_audioBuffer.pData[i] << " " ;
-    } 
-    //std::cout << std::endl ;
+    float * pFloats = reinterpret_cast<float *>( pData ) ;
     
     // Now handle buffer
-    int bit, len, pos, bit0 ;
+    int bit, len, bit0 ;
+    static int pos = 0 ;
     while ( !readBitsFsk ( &bit, &len ) ) {
 
         if ( len == 0 ) { // reset_frame();
@@ -193,36 +221,52 @@ int M10Decoder::readSignedSample
 (
 ) 
 {
-    int byte, i, sample, s = 0;       // EOF -> 0x1000000
+    int byte, i, s = 0;       // EOF -> 0x1000000
 
     for ( i = 0; i < m_nChannels; i++ ) {
         // i = 0: left, mono
-        if ( m_audioBuffer.currentPosition == m_audioBuffer.size )
-        {
-            return EOF_INT;
-        }
         byte = m_audioBuffer.pData[m_audioBuffer.currentPosition] ;
-        m_audioBuffer.currentPosition++;
 
-        if ( i == 0 )  sample = byte; 
-
-        if ( m_bitsPerSample == 16 ) {
+        if ( m_bitsPerSample == 8 ) {
             if ( m_audioBuffer.currentPosition == m_audioBuffer.size )
             {
                 return EOF_INT;
             }
-
-            byte = m_audioBuffer.pData[m_audioBuffer.currentPosition] ;
-            if ( i == 0 ) sample += byte << 8;
+            s = getUInt8 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) - 128 ; // 8bit: 00..FF, centerpoint 0x80=128
+            m_audioBuffer.currentPosition += 1 ;
         }
-
+        else if ( m_bitsPerSample == 16 ) {
+            if ( m_audioBuffer.currentPosition +2 >= m_audioBuffer.size )
+            {
+                return EOF_INT;
+            }
+            s = getInt16 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) ;// -32768 ; // minus 2^15
+            m_audioBuffer.currentPosition += 2 ;
+        } 
+        else if ( m_bitsPerSample == 32 ) 
+        {
+            if ( m_audioBuffer.currentPosition + 4 >= m_audioBuffer.size )
+            {
+                return EOF_INT;
+            }
+            if ( m_sampleType == ST_FLOAT )
+            {
+                float f = *reinterpret_cast<float *>( m_audioBuffer.pData + m_audioBuffer.currentPosition ) ;
+                s = f * 1000;
+                m_audioBuffer.currentPosition += 4 ;
+            }
+            else
+            {
+                s = getInt32 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) ;// -pow ( 2, 22 ) ;// minus 2^22
+                m_audioBuffer.currentPosition += 4 ;
+            }
+        }
+        else
+        {
+            throw "Nope" ;
+        }
     }
-
-    if ( m_bitsPerSample == 8 )  s = sample - 128;   // 8bit: 00..FF, centerpoint 0x80=128
-    if ( m_bitsPerSample == 16 )  s = (short)sample;
-    // TODO what to do here ?
-    if ( m_bitsPerSample == 32 )  s = (short)sample;
-
+    //std::cout << s << std::endl;
     return s;
 }
 

@@ -25,13 +25,19 @@ typedef struct Configuration_s {
 } Configuration_t;
 
 typedef struct AudioBuffer {
-    BYTE * pData ;
+    uint8_t * pData ;
     UINT32 size ;
     UINT32 currentPosition ;
     AudioBuffer ()
         : pData ( NULL )
         , size ( 0 )
         , currentPosition ( 0 ) {}
+} ;
+
+typedef enum SampleType {
+    ST_INT,
+    ST_FLOAT,
+    ST_INVALID
 } ;
 
 #define BITS 8
@@ -127,5 +133,7 @@ private:
     int m_auxlen = 0; // 0 .. 0x76-0x64
 
     bool m_isHeaderFound ;
+
+    SampleType m_sampleType ;
 };
 

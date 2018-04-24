@@ -130,7 +130,7 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
     WAVEFORMATEX *pwfx = NULL;
     UINT32 packetLength = 0;
     BOOL bDone = FALSE;
-    BYTE *pData;
+    uint8_t *pData;
     DWORD flags;
 
     hr = CoCreateInstance (
