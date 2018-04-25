@@ -176,6 +176,8 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
         // Calculate the actual duration of the allocated buffer.
         hnsActualDuration = (double)REFTIMES_PER_SEC *
         bufferFrameCount / pwfx->nSamplesPerSec;
+        
+        printf( "Buffer duration : %f\n", hnsActualDuration ) ;
 
     hr = pAudioClient->Start ();  // Start recording.
     EXIT_ON_ERROR ( hr )
@@ -184,7 +186,7 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
         while ( bDone == FALSE )
         {
             // Sleep for half the buffer duration.
-            Sleep ( hnsActualDuration / REFTIMES_PER_MILLISEC / 2 );
+            // Sleep ( hnsActualDuration / REFTIMES_PER_MILLISEC / 2 );
 
             hr = pCaptureClient->GetNextPacketSize ( &packetLength );
             EXIT_ON_ERROR ( hr )
