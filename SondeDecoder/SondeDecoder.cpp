@@ -177,7 +177,7 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
         hnsActualDuration = (double)REFTIMES_PER_SEC *
         bufferFrameCount / pwfx->nSamplesPerSec;
         
-        printf( "Buffer duration : %f\n", hnsActualDuration ) ;
+        printf( "Buffer duration : %f s\n", (double)bufferFrameCount / pwfx->nSamplesPerSec ) ;
 
     hr = pAudioClient->Start ();  // Start recording.
     EXIT_ON_ERROR ( hr )
@@ -186,7 +186,7 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
         while ( bDone == FALSE )
         {
             // Sleep for half the buffer duration.
-            // Sleep ( hnsActualDuration / REFTIMES_PER_MILLISEC / 2 );
+            Sleep ( (double)hnsActualDuration / REFTIMES_PER_MILLISEC / 2 );
 
             hr = pCaptureClient->GetNextPacketSize ( &packetLength );
             EXIT_ON_ERROR ( hr )
@@ -203,6 +203,14 @@ HRESULT RecordAudioStream ( M10Decoder *pMySink )
                         if ( flags & AUDCLNT_BUFFERFLAGS_SILENT )
                         {
                             pData = NULL;  // Tell CopyData to write silence.
+                        }
+                        else if ( flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY )
+                        {
+                            printf ( "Data discontinuity error.\n" ) ;
+                        }
+                        else if ( flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR )
+                        {
+                            printf ( "Timestamp error.\n" ) ;
                         }
 
                     // Copy the available capture data to the audio sink.

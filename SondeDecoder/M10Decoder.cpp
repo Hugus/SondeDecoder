@@ -105,89 +105,108 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 #define pos_Check     (stdFLEN-1)  // 2 byte
 
 int32_t max = 0 ;
+int pos = 0 ;
+int audioBufferCount = 0 ;
+
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
-    m_audioBuffer.currentPosition = 0 ;
-    m_audioBuffer.pData = pData ;
-    m_audioBuffer.size = numFramesAvailable * m_bitsPerSample / 8 ;
+    if ( audioBufferCount == 0 )
+    {
+        m_audioBuffer.pData = new uint8_t[numFramesAvailable*m_bitsPerSample * 51] ;
+        m_audioBuffer.currentPosition = 0 ;
+        m_audioBuffer.size = numFramesAvailable*m_bitsPerSample * 51 ;
+    }
+    // Increment audio buffer counter
+    ++audioBufferCount ;
+    if ( ( audioBufferCount % 50 ) == 0 )
+    {
+        m_audioBuffer.currentPosition = 0 ;
+        // Handle buffer
 
-    float * pFloats = reinterpret_cast<float *>( pData ) ;
-    
-    // Now handle buffer
-    int bit, len, bit0 ;
-    static int pos = 0 ;
-    while ( !readBitsFsk ( &bit, &len ) ) {
+        float * pFloats = reinterpret_cast<float *>( m_audioBuffer.pData ) ;
 
-        if ( len == 0 ) { // reset_frame();
-            if ( pos > ( pos_GPSweek + 2 ) * 2 * BITS ) {
-                for (unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
-                print_frame ( pos );//byte_count
-                m_isHeaderFound = false;
-                pos = FRAMESTART;
-            }
-            //inc_m_bufPos();
-            //buf[m_bufPos] = 'x';
-            continue;   // ...
-        }
+        // Now handle buffer
+        int bit, len, bit0 ;
+        while ( !readBitsFsk ( &bit, &len ) ) {
 
-        for ( unsigned int i = 0; i < len; i++ ) {
-
-            incrementBufferIndex ();
-            buf[m_bufPos] = 0x30 + bit;  // Ascii
-
-            if ( !m_isHeaderFound ) {
-                m_isHeaderFound = IsThisAHeader ();
-            }
-            else {
-                frame_rawbits[pos] = 0x30 + bit;  // Ascii
-                pos++;
-
-                if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                    frame_rawbits[pos] = '\0';
-                    print_frame ( pos );//FRAME_LEN
+            if ( len == 0 ) { // reset_frame();
+                if ( pos > ( pos_GPSweek + 2 ) * 2 * BITS ) {
+                    for ( unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
+                    print_frame ( pos );//byte_count
                     m_isHeaderFound = false;
                     pos = FRAMESTART;
                 }
+                //inc_m_bufPos();
+                //buf[m_bufPos] = 'x';
+                continue;   // ...
             }
 
+            for ( unsigned int i = 0; i < len; i++ ) {
+
+                incrementBufferIndex ();
+                buf[m_bufPos] = 0x30 + bit;  // Ascii
+
+                if ( !m_isHeaderFound ) {
+                    m_isHeaderFound = IsThisAHeader ();
+                }
+                else {
+                    frame_rawbits[pos] = 0x30 + bit;  // Ascii
+                    pos++;
+
+                    if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
+                        frame_rawbits[pos] = '\0';
+                        print_frame ( pos );//FRAME_LEN
+                        m_isHeaderFound = false;
+                        pos = FRAMESTART;
+                    }
+                }
+
+            }
+            if ( m_isHeaderFound && ( m_configuration.b == 1 ) ) {
+                m_bitStart = true;
+
+                while ( pos < RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
+                    if ( readRawbit ( &bit ) == EOF ) break;
+                    frame_rawbits[pos] = 0x30 + bit;
+                    pos++;
+                }
+                frame_rawbits[pos] = '\0';
+                print_frame ( pos );
+                m_isHeaderFound = false;
+                pos = FRAMESTART;
+            }
+            if ( m_isHeaderFound && m_configuration.b >= 2 ) {
+                m_bitStart = true;
+                bit0 = 0;
+
+                if ( pos % 2 ) {
+                    if ( readRawbit ( &bit ) == EOF ) break;
+                    frame_rawbits[pos] = 0x30 + bit;
+                    pos++;
+                }
+
+                bit0 = dpsk_bpm ( frame_rawbits, frame_bits, pos );
+                pos /= 2;
+
+                while ( pos < BITFRAME_LEN + BITAUX_LEN ) {
+                    if ( readRawbit2 ( &bit ) == EOF ) break;
+                    frame_bits[pos] = 0x31 ^ ( bit0 ^ bit );
+                    pos++;
+                    bit0 = bit;
+                }
+                frame_bits[pos] = '\0';
+                print_frame ( pos );
+                m_isHeaderFound = false;
+                pos = FRAMESTART;
+            }
         }
-        if ( m_isHeaderFound && ( m_configuration.b == 1 ) ) {
-            m_bitStart = true;
-
-            while ( pos < RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                if ( readRawbit ( &bit ) == EOF ) break;
-                frame_rawbits[pos] = 0x30 + bit;
-                pos++;
-            }
-            frame_rawbits[pos] = '\0';
-            print_frame ( pos );
-            m_isHeaderFound = false;
-            pos = FRAMESTART;
-        }
-        if ( m_isHeaderFound && m_configuration.b >= 2 ) {
-            m_bitStart = true;
-            bit0 = 0;
-
-            if ( pos % 2 ) {
-                if ( readRawbit ( &bit ) == EOF ) break;
-                frame_rawbits[pos] = 0x30 + bit;
-                pos++;
-            }
-
-            bit0 = dpsk_bpm ( frame_rawbits, frame_bits, pos );
-            pos /= 2;
-
-            while ( pos < BITFRAME_LEN + BITAUX_LEN ) {
-                if ( readRawbit2 ( &bit ) == EOF ) break;
-                frame_bits[pos] = 0x31 ^ ( bit0 ^ bit );
-                pos++;
-                bit0 = bit;
-            }
-            frame_bits[pos] = '\0';
-            print_frame ( pos );
-            m_isHeaderFound = false;
-            pos = FRAMESTART;
-        }
+        m_audioBuffer.currentPosition = 0 ;
+    }
+    else
+    {
+        // Buffer current buffer
+        memcpy ( m_audioBuffer.pData + m_audioBuffer.currentPosition, pData, numFramesAvailable * m_bitsPerSample / 8 ) ;
+        m_audioBuffer.currentPosition += numFramesAvailable * m_bitsPerSample / 8 ;
     }
 
     return NOERROR;
@@ -236,7 +255,7 @@ int M10Decoder::readSignedSample
             m_audioBuffer.currentPosition += 1 ;
         }
         else if ( m_bitsPerSample == 16 ) {
-            if ( m_audioBuffer.currentPosition +2 >= m_audioBuffer.size )
+            if ( m_audioBuffer.currentPosition +2 > m_audioBuffer.size )
             {
                 return EOF_INT;
             }
@@ -245,7 +264,7 @@ int M10Decoder::readSignedSample
         } 
         else if ( m_bitsPerSample == 32 ) 
         {
-            if ( m_audioBuffer.currentPosition + 4 >= m_audioBuffer.size )
+            if ( m_audioBuffer.currentPosition + 4 > m_audioBuffer.size )
             {
                 return EOF_INT;
             }
@@ -621,7 +640,14 @@ int M10Decoder::print_pos ( int csOK ) {
     else 
     {
         fprintf ( stdout, " (W %d) ", m_date.week );
-        fprintf ( stdout, "%s ", weekday[m_date.wday] );
+        if ( ( m_date.wday > 0 ) && ( m_date.wday < 7 ) )
+        {
+            fprintf ( stdout, "%s ", weekday[m_date.wday] );
+        }
+        else
+        {
+            fprintf ( stdout, "invalid " );
+        }
         fprintf ( stdout, "%04d-%02d-%02d (%02d:%02d:%02d) ",
             m_date.jahr, m_date.monat, m_date.tag, m_date.std, m_date.min, m_date.sek );
         fprintf ( stdout, " lat: %.6f ", m_date.lat );
@@ -672,7 +698,7 @@ void M10Decoder::print_frame ( int pos ) {
     if ( m_configuration.b < 2 ) {
         dpsk_bpm ( frame_rawbits, frame_bits, RAWBITFRAME_LEN + RAWBITAUX_LEN );
     }
-    bits2bytes ( frame_bits, frame_bytes, FRAME_LEN + AUX_LEN + 2 );
+    bits2bytes ( frame_bits, frame_bytes, FRAME_LEN + AUX_LEN );
     flen = frame_bytes[0];
     if ( flen == stdFLEN ) m_auxlen = 0;
     else {
@@ -701,13 +727,10 @@ void M10Decoder::print_frame ( int pos ) {
                 fprintf ( stdout, "%02x", byte );
                 fprintf ( stdout, col_FRTXT );
             }
-            if ( m_configuration.verbose ) {
-                fprintf ( stdout, " # "col_Check"%04x"col_FRTXT, cs2 );
-                if ( cs1 == cs2 ) fprintf ( stdout, " "col_CSok"[OK]"col_TXT );
-                else            fprintf ( stdout, " "col_CSno"[NO]"col_TXT );
-            }
-            fprintf ( stdout, ANSI_COLOR_RESET"\n" );
             */
+          
+            fprintf ( stdout, ANSI_COLOR_RESET"\n" );
+            
         }
         else {
             for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
@@ -733,6 +756,9 @@ void M10Decoder::print_frame ( int pos ) {
     }
     else print_pos ( cs1 == cs2 );
 
+    if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" );
+    else            fprintf ( stdout, " [NO]" );
+    fprintf ( stdout, "\n" );
 }
 
 /*
