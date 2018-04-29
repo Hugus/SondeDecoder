@@ -110,15 +110,8 @@ int audioBufferCount = 0 ;
 
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
-    if ( audioBufferCount == 0 )
-    {
-        m_audioBuffer.pData = new uint8_t[numFramesAvailable*m_bitsPerSample * 51] ;
-        m_audioBuffer.currentPosition = 0 ;
-        m_audioBuffer.size = numFramesAvailable*m_bitsPerSample * 51 ;
-    }
     // Increment audio buffer counter
-    ++audioBufferCount ;
-    if ( ( audioBufferCount % 50 ) == 0 )
+    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec ) > 1 )
     {
         m_audioBuffer.currentPosition = 0 ;
         // Handle buffer
@@ -200,12 +193,20 @@ HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * b
                 pos = FRAMESTART;
             }
         }
+        
+        // Reset audio buffer
         m_audioBuffer.currentPosition = 0 ;
+        m_audioBuffer.size = 0 ;
     }
     else
     {
         // Buffer current buffer
+        // Realloc data buffer
+        m_audioBuffer.size += numFramesAvailable * m_bitsPerSample / 8 ;
+        m_audioBuffer.pData = (uint8_t*) realloc ( m_audioBuffer.pData, m_audioBuffer.size ) ;
+        // Copy audio data
         memcpy ( m_audioBuffer.pData + m_audioBuffer.currentPosition, pData, numFramesAvailable * m_bitsPerSample / 8 ) ;
+        // Update current position
         m_audioBuffer.currentPosition += numFramesAvailable * m_bitsPerSample / 8 ;
     }
 
