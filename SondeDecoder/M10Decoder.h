@@ -68,6 +68,10 @@ public:
 
 
 private:
+
+    /// Main working function
+    void demodulateBuffer () ;
+
     /// Read a sample regardless of its size (8 or 16 bits)
     /// @returns signed sample as an integer
     int readSignedSample () ;
@@ -124,11 +128,14 @@ private:
 
     // Output buffers
     uint8_t frame_bytes[FRAME_LEN + AUX_LEN + 2];
+    // 
     char frame_rawbits[RAWBITFRAME_LEN + RAWBITAUX_LEN + 16];  // frame_rawbits-32="11001100110011001010011001001100";
     char frame_bits[BITFRAME_LEN + BITAUX_LEN + 8];
-    char buf[HEADLEN];
 
-    int m_bufPos ;
+    /// 'Circular buffer' used to find packet header
+    char header_buffer[HEADLEN];
+    /// Current position in header_buffer
+    int m_headerBufferPos ;
 
     int m_auxlen = 0; // 0 .. 0x76-0x64
 

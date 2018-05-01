@@ -27,7 +27,7 @@ M10Decoder::M10Decoder ()
     , m_parAlt( 1 )
     , m_bitStart( false )
     , m_sCount( 0 )
-    , m_bufPos( -1 )
+    , m_headerBufferPos( -1 )
     , m_auxlen( 0 )
     , m_isHeaderFound( false )
     , m_sampleType( ST_INVALID )
@@ -104,10 +104,6 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 #define pos_SN         0x5D  // 2+3 byte
 #define pos_Check     (stdFLEN-1)  // 2 byte
 
-int32_t max = 0 ;
-int pos = 0 ;
-int audioBufferCount = 0 ;
-
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
     // Increment audio buffer counter
@@ -119,80 +115,7 @@ HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * b
         float * pFloats = reinterpret_cast<float *>( m_audioBuffer.pData ) ;
 
         // Now handle buffer
-        int bit, len, bit0 ;
-        while ( !readBitsFsk ( &bit, &len ) ) {
-
-            if ( len == 0 ) { // reset_frame();
-                if ( pos > ( pos_GPSweek + 2 ) * 2 * BITS ) {
-                    for ( unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
-                    print_frame ( pos );//byte_count
-                    m_isHeaderFound = false;
-                    pos = FRAMESTART;
-                }
-                //inc_m_bufPos();
-                //buf[m_bufPos] = 'x';
-                continue;   // ...
-            }
-
-            for ( unsigned int i = 0; i < len; i++ ) {
-
-                incrementBufferIndex ();
-                buf[m_bufPos] = 0x30 + bit;  // Ascii
-
-                if ( !m_isHeaderFound ) {
-                    m_isHeaderFound = IsThisAHeader ();
-                }
-                else {
-                    frame_rawbits[pos] = 0x30 + bit;  // Ascii
-                    pos++;
-
-                    if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                        frame_rawbits[pos] = '\0';
-                        print_frame ( pos );//FRAME_LEN
-                        m_isHeaderFound = false;
-                        pos = FRAMESTART;
-                    }
-                }
-
-            }
-            if ( m_isHeaderFound && ( m_configuration.b == 1 ) ) {
-                m_bitStart = true;
-
-                while ( pos < RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                    if ( readRawbit ( &bit ) == EOF ) break;
-                    frame_rawbits[pos] = 0x30 + bit;
-                    pos++;
-                }
-                frame_rawbits[pos] = '\0';
-                print_frame ( pos );
-                m_isHeaderFound = false;
-                pos = FRAMESTART;
-            }
-            if ( m_isHeaderFound && m_configuration.b >= 2 ) {
-                m_bitStart = true;
-                bit0 = 0;
-
-                if ( pos % 2 ) {
-                    if ( readRawbit ( &bit ) == EOF ) break;
-                    frame_rawbits[pos] = 0x30 + bit;
-                    pos++;
-                }
-
-                bit0 = dpsk_bpm ( frame_rawbits, frame_bits, pos );
-                pos /= 2;
-
-                while ( pos < BITFRAME_LEN + BITAUX_LEN ) {
-                    if ( readRawbit2 ( &bit ) == EOF ) break;
-                    frame_bits[pos] = 0x31 ^ ( bit0 ^ bit );
-                    pos++;
-                    bit0 = bit;
-                }
-                frame_bits[pos] = '\0';
-                print_frame ( pos );
-                m_isHeaderFound = false;
-                pos = FRAMESTART;
-            }
-        }
+        demodulateBuffer () ;
         
         // Reset audio buffer
         m_audioBuffer.currentPosition = 0 ;
@@ -213,6 +136,50 @@ HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * b
     return NOERROR;
 }
 
+void M10Decoder::demodulateBuffer ()
+{
+    // Position in frame_rawbits buffer
+    int pos = FRAMESTART ;
+    // Current bit
+    int bit ;
+    // Number of bits read
+    int len ;
+    int bit0 ;
+    while ( !readBitsFsk ( &bit, &len ) ) {
+
+        if ( len == 0 ) { // reset_frame();
+            if ( pos > ( pos_GPSweek + 2 ) * 2 * BITS ) {
+                for ( unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
+                print_frame ( pos );//byte_count
+                m_isHeaderFound = false;
+                pos = FRAMESTART;
+            }
+            continue;
+        }
+
+        for ( unsigned int i = 0; i < len; i++ ) {
+
+            incrementBufferIndex ();
+            header_buffer[m_headerBufferPos] = 0x30 + bit;  // Ascii
+
+            if ( !m_isHeaderFound ) {
+                m_isHeaderFound = IsThisAHeader ();
+            }
+            else {
+                frame_rawbits[pos] = 0x30 + bit;  // Ascii
+                pos++;
+                // If a full frame has been read
+                if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
+                    frame_rawbits[pos] = '\0';
+                    print_frame ( pos );//FRAME_LEN
+                    m_isHeaderFound = false;
+                    pos = FRAMESTART;
+                }
+            }
+
+        }
+    }
+}
 
 
 /* big endian forest
@@ -411,7 +378,7 @@ const char header[] = "10011001100110010100110010011001";
 
 
 void M10Decoder::incrementBufferIndex () {
-    m_bufPos = ( m_bufPos + 1 ) % HEADLEN;
+    m_headerBufferPos = ( m_headerBufferPos + 1 ) % HEADLEN;
 }
 
 char cb_inv ( char c ) {
@@ -426,20 +393,20 @@ int M10Decoder::IsThisAHeader () {
     int i, j;
 
     i = 0;
-    j = m_bufPos;
+    j = m_headerBufferPos;
     while ( i < HEADLEN ) {
         if ( j < 0 ) j = HEADLEN - 1;
-        if ( buf[j] != header[HEADOFS + HEADLEN - 1 - i] ) break;
+        if ( header_buffer[j] != header[HEADOFS + HEADLEN - 1 - i] ) break;
         j--;
         i++;
     }
     if ( i == HEADLEN ) return 1;
 
     i = 0;
-    j = m_bufPos;
+    j = m_headerBufferPos;
     while ( i < HEADLEN ) {
         if ( j < 0 ) j = HEADLEN - 1;
-        if ( buf[j] != cb_inv ( header[HEADOFS + HEADLEN - 1 - i] ) ) break;
+        if ( header_buffer[j] != cb_inv ( header[HEADOFS + HEADLEN - 1 - i] ) ) break;
         j--;
         i++;
     }
@@ -696,55 +663,38 @@ void M10Decoder::print_frame ( int pos ) {
     int cs1, cs2;
     int flen = stdFLEN; // stdFLEN=0x64, auxFLEN=0x76
 
+    // Decode Manchester coding
     if ( m_configuration.b < 2 ) {
         dpsk_bpm ( frame_rawbits, frame_bits, RAWBITFRAME_LEN + RAWBITAUX_LEN );
     }
+    // Convert ascii packet to binary packet
     bits2bytes ( frame_bits, frame_bytes, FRAME_LEN + AUX_LEN );
+    // Get packet length
     flen = frame_bytes[0];
+    // If frame length is what we expected, auxlen is 0
     if ( flen == stdFLEN ) m_auxlen = 0;
     else {
+        // Else auxlen is the remaining number of bytes
         m_auxlen = flen - stdFLEN;
         if ( m_auxlen < 0 || m_auxlen > AUX_LEN ) m_auxlen = 0;
     }
 
+    // Received frame CRC
     cs1 = ( frame_bytes[pos_Check + m_auxlen] << 8 ) | frame_bytes[pos_Check + m_auxlen + 1];
+    // Computed frame CRC
     cs2 = checkM10 ( frame_bytes, pos_Check + m_auxlen );
 
+    // If option raw, print raw frame
     if ( m_configuration.raw ) {
-
-        if ( m_configuration.color  &&  frame_bytes[1] != 0x49 ) {
-            /*
-            fprintf ( stdout, col_FRTXT );
-            for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
-                byte = frame_bytes[i];
-                if ( ( i >= pos_GPSTOW ) && ( i < pos_GPSTOW + 4 ) )   fprintf ( stdout, col_GPSTOW );
-                if ( ( i >= pos_GPSlat ) && ( i < pos_GPSlat + 4 ) )   fprintf ( stdout, col_GPSlat );
-                if ( ( i >= pos_GPSlon ) && ( i < pos_GPSlon + 4 ) )   fprintf ( stdout, col_GPSlon );
-                if ( ( i >= pos_GPSalt ) && ( i < pos_GPSalt + 4 ) )   fprintf ( stdout, col_GPSalt );
-                if ( ( i >= pos_GPSweek ) && ( i < pos_GPSweek + 2 ) )  fprintf ( stdout, col_GPSweek );
-                if ( ( i >= pos_GPSvE ) && ( i < pos_GPSvE + 6 ) )    fprintf ( stdout, col_GPSvel );
-                if ( ( i >= pos_SN ) && ( i < pos_SN + 5 ) )       fprintf ( stdout, col_SN );
-                if ( ( i >= pos_Check + m_auxlen ) && ( i < pos_Check + m_auxlen + 2 ) )  fprintf ( stdout, col_Check );
-                fprintf ( stdout, "%02x", byte );
-                fprintf ( stdout, col_FRTXT );
-            }
-            */
-          
-            fprintf ( stdout, ANSI_COLOR_RESET"\n" );
-            
+        for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
+            byte = frame_bytes[i];
+            fprintf ( stdout, "%02x", byte );
         }
-        else {
-            for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
-                byte = frame_bytes[i];
-                fprintf ( stdout, "%02x", byte );
-            }
-            if ( m_configuration.verbose ) {
-                fprintf ( stdout, " # %04x", cs2 );
-                if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" ); else fprintf ( stdout, " [NO]" );
-            }
-            fprintf ( stdout, "\n" );
+        if ( m_configuration.verbose ) {
+            fprintf ( stdout, " # %04x", cs2 );
+            if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" ); else fprintf ( stdout, " [NO]" );
         }
-        
+        fprintf ( stdout, "\n" );
     }
     else if ( frame_bytes[1] == 0x49 ) {
         if ( m_configuration.verbose == 3 ) {
@@ -758,7 +708,7 @@ void M10Decoder::print_frame ( int pos ) {
     else print_pos ( cs1 == cs2 );
 
     if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" );
-    else            fprintf ( stdout, " [NO]" );
+    else              fprintf ( stdout, " [NO]" );
     fprintf ( stdout, "\n" );
 }
 

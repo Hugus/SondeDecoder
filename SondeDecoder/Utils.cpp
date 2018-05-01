@@ -3,6 +3,7 @@
 
 #define BITS 8
 
+// Convert bits (encoded as ascii string) to bytes
 int bits2bytes ( char *bitstr, uint8_t *bytes, unsigned int size ) {
     int i, bit, d, byteval;
     unsigned int bitpos, bytepos;
@@ -10,21 +11,21 @@ int bits2bytes ( char *bitstr, uint8_t *bytes, unsigned int size ) {
     bitpos = 0;
     bytepos = 0;
 
+    // For each input 'bit' of bitstr
     while ( bytepos < size ) {
-
         byteval = 0;
         d = 1;
         for ( i = 0; i < BITS; i++ ) {
-            //bit=*(bitstr+bitpos+i); /* little endian */
+            // Take one 'bit' (in ascii)
+            //bit=*(bitstr+bitpos+i);            /* little endian */
             bit = *( bitstr + bitpos + 7 - i );  /* big endian */
-                                                 // bit == 'x' ?
+            // If bit is one, add 2^i to byte value, else add 0
             if ( bit == '1' )                     byteval += d;
             else /*if ((bit == '0') || (bit == 'x'))*/  byteval += 0;
             d <<= 1;
         }
         bitpos += BITS;
         bytes[bytepos++] = byteval & 0xFF;
-
     }
 
     return 0;
@@ -52,6 +53,13 @@ void psk_bpm ( char* frame_rawbits, char *frame_bits, unsigned int frame_size ) 
     }
 }
 
+// Bit conversion (manchester coding):
+// Take two bits, apply the following function
+// 10 -> 1
+// 01 -> 0
+// Then, if bit(i) == bit(i-1) -> 1
+// Else  0
+// When i = 0, bit(i-1) = frame_rawbits[0] xor 1
 int dpsk_bpm ( char* frame_rawbits, char *frame_bits, int len ) {
     int i;
     char bit;
@@ -61,7 +69,6 @@ int dpsk_bpm ( char* frame_rawbits, char *frame_bits, int len ) {
     bit0 = ( frame_rawbits[0] & 1 ) ^ 1;
 
     for ( i = 0; i < len / 2; i++ ) {
-
         if ( ( frame_rawbits[2 * i] & 1 ) == 1 &&
             ( frame_rawbits[2 * i + 1] & 1 ) == 0 ) bit = 1;
         else if ( ( frame_rawbits[2 * i] & 1 ) == 0 &&
@@ -77,9 +84,7 @@ int dpsk_bpm ( char* frame_rawbits, char *frame_bits, int len ) {
         if ( bit0 == bit ) frame_bits[i] = '1';
         else             frame_bits[i] = '0';
         // frame_bits[i] = 0x31 ^ (bit0 ^ bit);
-
         bit0 = bit;
-
     }
 
     return bit0;
