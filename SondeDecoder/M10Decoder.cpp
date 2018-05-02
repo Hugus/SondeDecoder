@@ -118,7 +118,7 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
     // Increment audio buffer counter
-    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec ) > 1 )
+    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 1 )
     {
         m_audioBuffer.currentPosition = 0 ;
         // Handle buffer
@@ -136,12 +136,13 @@ HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * b
     {
         // Buffer current buffer
         // Realloc data buffer
-        m_audioBuffer.size += numFramesAvailable * m_bitsPerSample / 8 ;
+        uint32_t sizeIncrement = numFramesAvailable * m_bitsPerSample / 8 * m_nChannels ;
+        m_audioBuffer.size += sizeIncrement ;
         m_audioBuffer.pData = (uint8_t*) realloc ( m_audioBuffer.pData, m_audioBuffer.size ) ;
         // Copy audio data
-        memcpy ( m_audioBuffer.pData + m_audioBuffer.currentPosition, pData, numFramesAvailable * m_bitsPerSample / 8 ) ;
+        memcpy ( m_audioBuffer.pData + m_audioBuffer.currentPosition, pData, sizeIncrement ) ;
         // Update current position
-        m_audioBuffer.currentPosition += numFramesAvailable * m_bitsPerSample / 8 ;
+        m_audioBuffer.currentPosition += sizeIncrement ;
     }
 
     return NOERROR;
