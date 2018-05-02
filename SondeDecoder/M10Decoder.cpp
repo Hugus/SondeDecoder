@@ -32,6 +32,7 @@ M10Decoder::M10Decoder ()
     , m_isHeaderFound( false )
     , m_sampleType( ST_INVALID )
 {
+    m_configuration.verbose = 1 ;
 }
 
 
@@ -45,13 +46,21 @@ HRESULT M10Decoder::SetFormat ( WAVEFORMATEX * pwfx )
     m_samplePerSec = pwfx->nSamplesPerSec ;
     m_nChannels = pwfx->nChannels ;
     m_samplePerBit = m_samplePerSec / m_baudRate;
+
+    std::cout << "Bits per sample : " << m_bitsPerSample << std::endl ;
+    std::cout << "Samples per second : " << m_samplePerSec << std::endl ;
+    std::cout << "Samples per bit : " << m_samplePerBit << std::endl ;
+    std::cout << "Number of channels : " << m_nChannels << std::endl ;
+
     if ( pwfx->wFormatTag == WAVE_FORMAT_PCM )
     {
         m_sampleType = ST_INT ;
+        std::cout << "Sample type : INT" << std::endl ;
     }
     else if ( pwfx->wFormatTag == WAVE_FORMAT_IEEE_FLOAT )
     {
         m_sampleType = ST_FLOAT ;
+        std::cout << "Sample type : FLOAT" << std::endl ;
     }
     else if ( pwfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE )
     {
@@ -59,10 +68,12 @@ HRESULT M10Decoder::SetFormat ( WAVEFORMATEX * pwfx )
         if ( extension->SubFormat == KSDATAFORMAT_SUBTYPE_PCM )
         {
             m_sampleType = ST_INT ;
+            std::cout << "Sample type : subformat INT" << std::endl ;
         }
         else if ( extension->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT )
         {
             m_sampleType = ST_FLOAT ;
+            std::cout << "Sample type : subformat FLOAT" << std::endl ;
         }
         else
         {
@@ -629,7 +640,7 @@ int M10Decoder::print_pos ( int csOK ) {
                 m_date );
             if ( !err ) {
                 //if (m_configuration.verbose == 2) fprintf(stdout, "  (%.1f , %.1f : %.1f°) ", m_date.vx, m_date.vy, m_date.vD2);
-                fprintf ( stdout, "  vH: %.1f  D: %.1f°  vV: %.1f ", m_date.vH, m_date.vD, m_date.vV );
+                fprintf ( stdout, "  vH: %.1f  D: %.1f  vV: %.1f ", m_date.vH, m_date.vD, m_date.vV );
             }
             if ( m_configuration.verbose >= 2 ) {
                 GPS::get_SN ( frame_bytes, pos_GPSalt, m_date );
