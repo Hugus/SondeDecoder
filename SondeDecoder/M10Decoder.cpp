@@ -33,7 +33,7 @@ M10Decoder::M10Decoder ()
     , m_sampleType( ST_INVALID )
 {
     m_configuration.verbose = 1 ;
-    m_configuration.ptu = true ;
+    m_configuration.ptu = 1 ;
 
     std::cout << "SondeDecoder v1.0." << std::endl ;
 }
@@ -713,7 +713,7 @@ void M10Decoder::print_frame ( int pos ) {
         }
         fprintf ( stdout, "\n" );
     }
-    else if ( frame_bytes[1] == 0x49 ) {
+    /*else if ( frame_bytes[1] == 0x49 ) {
         if ( m_configuration.verbose == 3 ) {
             for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
                 byte = frame_bytes[i];
@@ -721,7 +721,7 @@ void M10Decoder::print_frame ( int pos ) {
             }
             fprintf ( stdout, "\n" );
         }
-    }
+    }*/
     else print_pos ( cs1 == cs2 );
 
     fprintf ( stdout, "\n" );
