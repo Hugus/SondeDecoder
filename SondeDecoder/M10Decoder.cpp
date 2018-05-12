@@ -566,7 +566,7 @@ frame[0x61]: adr_1081h (SN)
 */
 
 /* -------------------------------------------------------------------------- */
-char weekday[7][3] = { "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa" };
+char weekday[7][3] = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
 
 int M10Decoder::print_pos ( int csOK ) {
     int err;
@@ -623,7 +623,7 @@ int M10Decoder::print_pos ( int csOK ) {
     else 
     {
         fprintf ( stdout, " (W %d) ", m_date.week );
-        if ( ( m_date.wday > 0 ) && ( m_date.wday < 7 ) )
+        if ( ( m_date.wday >= 0 ) && ( m_date.wday < 7 ) )
         {
             fprintf ( stdout, "%s ", weekday[m_date.wday] );
         }
