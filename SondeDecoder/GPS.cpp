@@ -139,6 +139,7 @@ GPS::get_GPSvel
     date.vD2 = dir;
     //*/
     dir = atan2 ( vx, vy ) * 180 / M_PI;
+    dir -= 180 ;
     if ( dir < 0 ) dir += 360;
     date.vD = dir;
 

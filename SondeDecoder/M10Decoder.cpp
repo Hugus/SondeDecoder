@@ -33,6 +33,9 @@ M10Decoder::M10Decoder ()
     , m_sampleType( ST_INVALID )
 {
     m_configuration.verbose = 1 ;
+    m_configuration.ptu = true ;
+
+    std::cout << "SondeDecoder v1.0." << std::endl ;
 }
 
 
@@ -117,8 +120,8 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
-    // Increment audio buffer counter
-    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 1 )
+    // Increment audio buffer counter so as to bufferize 0.9s
+    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 0.9 )
     {
         m_audioBuffer.currentPosition = 0 ;
         // Handle buffer
@@ -637,7 +640,7 @@ int M10Decoder::print_pos ( int csOK ) {
             err |= GPS::get_GPSvel ( frame_bytes, 
                 pos_GPSvE,
                 pos_GPSvN,
-                pos_GPSvN,
+                pos_GPSvU,
                 m_date );
             if ( !err ) {
                 //if (m_configuration.verbose == 2) fprintf(stdout, "  (%.1f , %.1f : %.1f°) ", m_date.vx, m_date.vy, m_date.vD2);
@@ -696,6 +699,8 @@ void M10Decoder::print_frame ( int pos ) {
     // Computed frame CRC
     cs2 = checkM10 ( frame_bytes, pos_Check + m_auxlen );
 
+    if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" );
+    else              fprintf ( stdout, " [NOT OK]" );
     // If option raw, print raw frame
     if ( m_configuration.raw ) {
         for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
@@ -719,8 +724,6 @@ void M10Decoder::print_frame ( int pos ) {
     }
     else print_pos ( cs1 == cs2 );
 
-    if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" );
-    else              fprintf ( stdout, " [NO]" );
     fprintf ( stdout, "\n" );
 }
 
