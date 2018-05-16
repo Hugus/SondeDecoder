@@ -17,7 +17,7 @@ ShibauraSensor::~ShibauraSensor ()
 // Temperatur Sensor
 // NTC-Thermistor Shibaura PB5-41E
 //
-float ShibauraSensor::get_Temp ( int csOK, uint8_t * frame_bytes, int verbose ) {
+float ShibauraSensor::get_Temp ( uint8_t * frame_bytes, int verbose ) {
     // NTC-Thermistor Shibaura PB5-41E
     // T00 = 273.15 +  0.0 , R00 = 15e3
     // T25 = 273.15 + 25.0 , R25 = 5.369e3
@@ -73,7 +73,7 @@ float ShibauraSensor::get_Temp ( int csOK, uint8_t * frame_bytes, int verbose ) 
 
     if ( R > 0 )  T = 1 / ( p0 + p1*log ( R ) + p2*log ( R )*log ( R ) + p3*log ( R )*log ( R )*log ( R ) );
 
-    if ( verbose >= 3 && csOK ) { // on-chip temperature
+    if ( verbose >= 3 ) { // on-chip temperature
         uint16_t ADC_Ti_raw = ( frame_bytes[0x49] << 8 ) | frame_bytes[0x48]; // int.temp.diode, ref: 4095->1.5V
         float vti, ti;
         // INCH1A (temp.diode), slau144
@@ -90,7 +90,7 @@ float ShibauraSensor::get_Temp ( int csOK, uint8_t * frame_bytes, int verbose ) 
     return  T - 273.15; // Celsius
 }
 
-float ShibauraSensor::get_Tntc2 ( int csOK, uint8_t * frame_bytes ) {
+float ShibauraSensor::get_Tntc2 ( uint8_t * frame_bytes ) {
     // SMD ntc
     float Rs = 22.1e3;          // P5.6=Vcc
                                 //  float R25 = 2.2e3;
@@ -104,7 +104,7 @@ float ShibauraSensor::get_Tntc2 ( int csOK, uint8_t * frame_bytes ) {
     float T = 0.0;              // T/Kelvin
     uint16_t ADC_ntc2;            // ADC12 P6.4(A4)
     float x, R;
-    if ( csOK )
+
     {
         ADC_ntc2 = ( frame_bytes[0x5A] << 8 ) | frame_bytes[0x59];
         x = ( 4095.0 - ADC_ntc2 ) / ADC_ntc2;  // (Vcc-Vout)/Vout

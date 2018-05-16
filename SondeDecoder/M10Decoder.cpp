@@ -34,6 +34,7 @@ M10Decoder::M10Decoder ()
 {
     m_configuration.verbose = 1 ;
     m_configuration.ptu = 1 ;
+    //m_configuration.raw = 1 ;
 
     std::cout << "SondeDecoder v1.0." << std::endl ;
 }
@@ -104,19 +105,30 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 */
 
 /* -------------------------------------------------------------------------- */
-
+// Old M10
 #define stdFLEN        0x64  // pos[0]=0x64
-#define pos_GPSTOW     0x0A  // 4 byte
-#define pos_GPSlat     0x0E  // 4 byte
-#define pos_GPSlon     0x12  // 4 byte
-#define pos_GPSalt     0x16  // 4 byte
-#define pos_GPSweek    0x20  // 2 byte
+#define pos_trimble_gpstow     0x0A  // 4 byte
+#define pos_trimble_gpslat     0x0E  // 4 byte
+#define pos_trimble_gpslon     0x12  // 4 byte
+#define pos_trimble_gpsalt     0x16  // 4 byte
+#define pos_trimble_gpsweek    0x20  // 2 byte
 //Velocity East-North-Up (ENU)
-#define pos_GPSvE      0x04  // 2 byte
-#define pos_GPSvN      0x06  // 2 byte
-#define pos_GPSvU      0x08  // 2 byte
-#define pos_SN         0x5D  // 2+3 byte
-#define pos_Check     (stdFLEN-1)  // 2 byte
+#define pos_trimble_gpsvE      0x04  // 2 byte
+#define pos_trimble_gpsvN      0x06  // 2 byte
+#define pos_trimble_gpsvU      0x08  // 2 byte
+#define pos_trimble_SN         0x5D  // 2+3 byte
+#define pos_trimble_check     (stdFLEN-1)  // 2 byte
+
+// New M10
+#define pos_gtop_gpslat     0x04  // 4 byte
+#define pos_gtop_gpslon     0x08  // 4 byte
+#define pos_gtop_gpsalt     0x0C  // 3 byte
+#define pos_gtop_gpsvE      0x0F  // 2 byte
+#define pos_gtop_gpsvN      0x11  // 2 byte
+#define pos_gtop_gpsvU      0x13  // 2 byte
+#define pos_gtop_time       0x15  // 3 byte
+#define pos_gtop_date       0x18 // 3 byte
+
 
 HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
 {
@@ -163,7 +175,7 @@ void M10Decoder::demodulateBuffer ()
     while ( !readBitsFsk ( &bit, &len ) ) {
 
         if ( len == 0 ) { // reset_frame();
-            if ( pos > ( pos_GPSweek + 2 ) * 2 * BITS ) {
+            if ( pos > ( pos_trimble_gpsweek + 2 ) * 2 * BITS ) {
                 for ( unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
                 print_frame ( pos );//byte_count
                 m_isHeaderFound = false;
@@ -307,79 +319,10 @@ int M10Decoder::readBitsFsk ( int *bit, int *len ) {
     return 0;
 }
 
-
-int M10Decoder::readRawbit ( int *bit ) {
-    int sample;
-    int sum;
-
-    sum = 0;
-
-    if ( m_bitStart ) {
-        m_sCount = 0;         // actually m_sCount = 1
-        m_bitSeparator = 0;   //   or m_bitSeparator = -1
-        m_bitStart = false;
-    }
-    m_bitSeparator += m_samplePerBit;
-
-    do {
-        sample = readSignedSample ();
-        if ( sample == EOF_INT ) return EOF;
-        sum += sample;
-        m_sCount++;
-    } while ( m_sCount < m_bitSeparator );  // n < m_samplePerBit
-
-    if ( sum >= 0 ) *bit = 1;
-    else            *bit = 0;
-
-    if ( m_configuration.inv ) *bit ^= 1;
-
-    return 0;
-}
-
-int M10Decoder::readRawbit2 ( int *bit ) {
-    int sample;
-    int sum;
-
-    sum = 0;
-
-    if ( m_bitStart ) {
-        m_sCount = 0;    // eigentlich m_sCount = 1
-        m_bitSeparator = 0; //   oder m_bitSeparator = -1
-        m_bitStart = false;
-    }
-
-    m_bitSeparator += m_samplePerBit;
-    do {
-        sample = readSignedSample ();
-        if ( sample == EOF_INT ) return EOF;
-        sum += sample;
-        m_sCount++;
-    } while ( m_sCount < m_bitSeparator );  // n < m_samplePerBit
-
-    m_bitSeparator += m_samplePerBit;
-    do {
-        sample = readSignedSample ();
-        if ( sample == EOF_INT ) return EOF;
-        sum -= sample;
-        m_sCount++;
-    } while ( m_sCount < m_bitSeparator );  // n < m_samplePerBit
-
-    if ( sum >= 0 ) *bit = 1;
-    else            *bit = 0;
-
-    if ( m_configuration.inv ) *bit ^= 1;
-
-    return 0;
-}
-
 /* -------------------------------------------------------------------------- */
 
 /*
 Header = Sync-Header + Sonde-Header:
-1100110011001100 1010011001001100  1101010011010011 0100110101010101 0011010011001100
-uudduudduudduudd ududduuddudduudd  uudududduududduu dudduudududududu dduududduudduudd (oder:)
-dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduudduudduu (komplement)
-0 0 0 0 0 0 0 0  1 1 - - - 0 0 0   0 1 1 0 0 1 0 0  1 0 0 1 1 1 1 1  0 0 1 0 0 0 0 0
 */
 
 
@@ -388,9 +331,6 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 //"011101101001111100100000"; // M10: 76 9F 20 , aux-data?
 //"011001000100100100001001"; // M10-dop: 64 49 09
 const char header[] = "10011001100110010100110010011001";
-
-// int m_auxlen = 0; // 0 .. 0x76-0x64
-
 
 void M10Decoder::incrementBufferIndex () {
     m_headerBufferPos = ( m_headerBufferPos + 1 ) % HEADLEN;
@@ -432,32 +372,6 @@ int M10Decoder::IsThisAHeader () {
 
 
 
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
-
-#define XTERM_COLOR_BROWN   "\x1b[38;5;94m"  // 38;5;{0..255}m
-
-#define col_GPSweek    "\x1b[38;5;20m"  // 2 byte
-#define col_GPSTOW     "\x1b[38;5;27m"  // 4 byte
-#define col_GPSdate    "\x1b[38;5;94m" //111
-#define col_GPSlat     "\x1b[38;5;34m"  // 4 byte
-#define col_GPSlon     "\x1b[38;5;70m"  // 4 byte
-#define col_GPSalt     "\x1b[38;5;82m"  // 4 byte
-#define col_GPSvel     "\x1b[38;5;36m"  // 6 byte
-#define col_SN         "\x1b[38;5;58m"  // 3 byte
-#define col_Check      "\x1b[38;5;11m"  // 2 byte
-#define col_TXT        "\x1b[38;5;244m"
-#define col_FRTXT      "\x1b[38;5;244m"
-#define col_CSok       "\x1b[38;5;2m"
-#define col_CSno       "\x1b[38;5;1m"
-
-
-
 /* -------------------------------------------------------------------------- */
 /*
 g : F^n -> F^16      // checksum, linear
@@ -465,23 +379,6 @@ g(m||b) = f(g(m),b)
 
 // update checksum
 f : F^16 x F^8 -> F^16 linear
-
-010100001000000101000000
-001010000100000010100000
-000101000010000001010000
-000010100001000000101000
-000001010000100000010100
-100000100000010000001010
-000000011010100000000100
-100000000101010000000010
-000000001000000000000000
-000000000100000000000000
-000000000010000000000000
-000000000001000000000000
-000000000000100000000000
-000000000000010000000000
-000000000000001000000000
-000000000000000100000000
 */
 
 int M10Decoder::update_checkM10 ( int c, uint8_t b ) {
@@ -568,106 +465,65 @@ frame[0x61]: adr_1081h (SN)
 /* -------------------------------------------------------------------------- */
 char weekday[7][3] = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
 
-int M10Decoder::print_pos ( int csOK ) {
+int M10Decoder::print_pos ( SondeType sondeType ) {
     int err;
 
     err = 0;
-    GPS::get_GPSweek ( frame_bytes, pos_GPSweek, m_date);
-    GPS::get_GPStime ( frame_bytes, pos_GPSTOW, m_date );
-    GPS::get_GPSlat ( frame_bytes, pos_GPSlat, m_date );
-    GPS::get_GPSlon ( frame_bytes, pos_GPSlon, m_date );
-    GPS::get_GPSalt ( frame_bytes, pos_GPSalt, m_date );
-
-
-
-    GPS::Gps2Date ( m_date.week, m_date.gpssec, &m_date.jahr, &m_date.monat, &m_date.tag );
-
-    if ( m_configuration.color ) {
-        /*
-        fprintf ( stdout, col_TXT );
-        fprintf ( stdout, " (W "col_GPSweek"%d"col_TXT") ", m_date.week );
-        fprintf ( stdout, col_GPSTOW"%s"col_TXT" ", weekday[m_date.wday] );
-        fprintf ( stdout, col_GPSdate"%04d-%02d-%02d"col_TXT" ("col_GPSTOW"%02d:%02d:%02d"col_TXT") ",
-            m_date.jahr, m_date.monat, m_date.tag, m_date.std, m_date.min, m_date.sek );
-        fprintf ( stdout, " lat: "col_GPSlat"%.6f"col_TXT" ", m_date.lat );
-        fprintf ( stdout, " lon: "col_GPSlon"%.6f"col_TXT" ", m_date.lon );
-        fprintf ( stdout, " alt: "col_GPSalt"%.2f"col_TXT" ", m_date.alt );
-        if ( m_configuration.verbose ) {
-            err |= GPS::get_GPSvel ();
-            if ( !err ) {
-                //if (m_configuration.verbose == 2) fprintf(stdout, "  "col_GPSvel"(%.1f , %.1f : %.1f)"col_TXT" ", m_date.vx, m_date.vy, m_date.vD2);
-                fprintf ( stdout, "  vH: "col_GPSvel"%.1f"col_TXT"  D: "col_GPSvel"%.1f"col_TXT"°  vV: "col_GPSvel"%.1f"col_TXT" ", m_date.vH, m_date.vD, m_date.vV );
-            }
-            if ( m_configuration.verbose >= 2 ) {
-                GPS::get_SN ();
-                fprintf ( stdout, "  SN: "col_SN"%s"col_TXT, m_date.SN );
-            }
-            if ( m_configuration.verbose >= 2 ) {
-                fprintf ( stdout, "  # " );
-                if ( csOK ) fprintf ( stdout, " "col_CSok"[OK]"col_TXT );
-                else      fprintf ( stdout, " "col_CSno"[NO]"col_TXT );
-            }
-        }
-        if ( m_configuration.ptu ) {
-            float t = ShibauraSensor::get_Temp ( csOK, frame_bytes, m_configuration.verbose );
-            if ( t > -270.0 ) fprintf ( stdout, "  T=%.1fC ", t );
-            if ( m_configuration.verbose >= 3 ) {
-                float t2 = ShibauraSensor::get_Tntc2 ( csOK, frame_bytes );
-                float fq555 = ShibauraSensor::get_TLC555freq ( frame_bytes );
-                if ( t2 > -270.0 ) fprintf ( stdout, " (T2:%.1fC) (%.3fkHz) ", t2, fq555 / 1e3 );
-            }
-        }
-        fprintf ( stdout, ANSI_COLOR_RESET"" );
-        */
-    }
-    else 
+    if ( sondeType == SOT_TRIMBLE )
     {
-        fprintf ( stdout, " (W %d) ", m_date.week );
-        if ( ( m_date.wday >= 0 ) && ( m_date.wday < 7 ) )
-        {
-            fprintf ( stdout, "%s ", weekday[m_date.wday] );
-        }
-        else
-        {
-            fprintf ( stdout, "invalid " );
-        }
-        fprintf ( stdout, "%04d-%02d-%02d (%02d:%02d:%02d) ",
-            m_date.jahr, m_date.monat, m_date.tag, m_date.std, m_date.min, m_date.sek );
+        GPSTrimble::get_GPSweek ( frame_bytes, pos_trimble_gpsweek, m_date );
+        GPSTrimble::get_GPStime ( frame_bytes, pos_trimble_gpstow, m_date );
+        GPSTrimble::get_GPSlat ( frame_bytes, pos_trimble_gpslat, m_date );
+        GPSTrimble::get_GPSlon ( frame_bytes, pos_trimble_gpslon, m_date );
+        GPSTrimble::get_GPSalt ( frame_bytes, pos_trimble_gpsalt, m_date );
+        GPSTrimble::Gps2Date ( m_date.week, m_date.gpssec, &m_date.jahr, &m_date.monat, &m_date.tag );
+
+        GPSTrimble::get_GPSvel ( frame_bytes,
+            pos_trimble_gpsvE,
+            pos_trimble_gpsvN,
+            pos_trimble_gpsvU,
+            m_date );
+    }
+    else
+    {
+        GPSGtop::get_GPStime ( frame_bytes, pos_gtop_time, m_date );
+        GPSGtop::get_GPSlat ( frame_bytes, pos_gtop_gpslat, m_date );
+        GPSGtop::get_GPSlon ( frame_bytes, pos_gtop_gpslon, m_date );
+        GPSGtop::get_GPSalt ( frame_bytes, pos_gtop_gpsalt, m_date );
+
+        GPSGtop::get_GPSvel ( frame_bytes,
+            pos_gtop_gpsvE,
+            pos_gtop_gpsvN,
+            pos_gtop_gpsvU,
+            m_date );
+    }
+    
+    {
+        fprintf ( stdout, "%02d:%02d:%02d",
+            m_date.std, m_date.min, m_date.sek );
         fprintf ( stdout, " lat: %.6f ", m_date.lat );
         fprintf ( stdout, " lon: %.6f ", m_date.lon );
         fprintf ( stdout, " alt: %.2f ", m_date.alt );
         if ( m_configuration.verbose ) {
-            err |= GPS::get_GPSvel ( frame_bytes, 
-                pos_GPSvE,
-                pos_GPSvN,
-                pos_GPSvU,
-                m_date );
-            if ( !err ) {
-                //if (m_configuration.verbose == 2) fprintf(stdout, "  (%.1f , %.1f : %.1f°) ", m_date.vx, m_date.vy, m_date.vD2);
-                fprintf ( stdout, "  vH: %.1f  D: %.1f  vV: %.1f ", m_date.vH, m_date.vD, m_date.vV );
-            }
+
+            fprintf ( stdout, "  vH: %.1f  D: %.1f  vV: %.1f ", m_date.vH, m_date.vD, m_date.vV );
+
             if ( m_configuration.verbose >= 2 ) {
-                GPS::get_SN ( frame_bytes, pos_GPSalt, m_date );
+                GPSTrimble::get_SN ( frame_bytes, pos_trimble_gpsalt, m_date );
                 fprintf ( stdout, "  SN: %s", m_date.SN );
-            }
-            if ( m_configuration.verbose >= 2 ) {
-                fprintf ( stdout, "  # " );
-                if ( csOK ) fprintf ( stdout, " [OK]" ); else fprintf ( stdout, " [NO]" );
             }
         }
         if ( m_configuration.ptu ) {
-            float t = ShibauraSensor::get_Temp ( csOK, frame_bytes, m_configuration.verbose );
+            float t = ShibauraSensor::get_Temp ( frame_bytes, m_configuration.verbose );
             if ( t > -270.0 ) fprintf ( stdout, "  T=%.1fC ", t );
             if ( m_configuration.verbose >= 3 ) {
-                float t2 = ShibauraSensor::get_Tntc2 ( csOK, frame_bytes );
+                float t2 = ShibauraSensor::get_Tntc2 ( frame_bytes );
                 float fq555 = ShibauraSensor::get_TLC555freq ( frame_bytes  );
                 if ( t2 > -270.0 ) fprintf ( stdout, " (T2:%.1fC) (%.3fkHz) ", t2, fq555 / 1e3 );
             }
         }
     }
     fprintf ( stdout, "\n" );
-
-    
 
     return err;
 }
@@ -695,9 +551,9 @@ void M10Decoder::print_frame ( int pos ) {
     }
 
     // Received frame CRC
-    cs1 = ( frame_bytes[pos_Check + m_auxlen] << 8 ) | frame_bytes[pos_Check + m_auxlen + 1];
+    cs1 = ( frame_bytes[pos_trimble_check + m_auxlen] << 8 ) | frame_bytes[pos_trimble_check + m_auxlen + 1];
     // Computed frame CRC
-    cs2 = checkM10 ( frame_bytes, pos_Check + m_auxlen );
+    cs2 = checkM10 ( frame_bytes, pos_trimble_check + m_auxlen );
 
     if ( cs1 == cs2 ) fprintf ( stdout, " [OK]" );
     else              fprintf ( stdout, " [NOT OK]" );
@@ -713,159 +569,23 @@ void M10Decoder::print_frame ( int pos ) {
         }
         fprintf ( stdout, "\n" );
     }
-    /*else if ( frame_bytes[1] == 0x49 ) {
-        if ( m_configuration.verbose == 3 ) {
-            for ( i = 0; i < FRAME_LEN + m_auxlen; i++ ) {
-                byte = frame_bytes[i];
-                fprintf ( stdout, "%02x", byte );
-            }
-            fprintf ( stdout, "\n" );
-        }
-    }*/
-    else print_pos ( cs1 == cs2 );
-
-    fprintf ( stdout, "\n" );
-}
-
-/*
-int main ( int argc, char **argv ) {
-
-    FILE *fp;
-    char *fpname;
-    int i, len;
-    int bit, bit0;
-    int pos;
-    int header_found = 0;
-
-    
-    fpname = argv[0];
-    ++argv;
-    while ( ( *argv ) && ( !m_configuration.wavloaded ) ) {
-        if ( ( strcmp ( *argv, "-h" ) == 0 ) || ( strcmp ( *argv, "--help" ) == 0 ) ) {
-            fprintf ( stderr, "%s [options] audio.wav\n", fpname );
-            fprintf ( stderr, "  options:\n" );
-            //fprintf(stderr, "       -v, --verbose\n");
-            fprintf ( stderr, "       -r, --raw\n" );
-            fprintf ( stderr, "       -c, --color\n" );
-            //fprintf(stderr, "       -o, --offset\n");
-            return 0;
-        }
-        else if ( ( strcmp ( *argv, "-v" ) == 0 ) || ( strcmp ( *argv, "--verbose" ) == 0 ) ) {
-            m_configuration.verbose = 1;
-        }
-        else if ( ( strcmp ( *argv, "-vv" ) == 0 ) ) m_configuration.verbose = 2;
-        else if ( ( strcmp ( *argv, "-vvv" ) == 0 ) ) m_configuration.verbose = 3;
-        else if ( ( strcmp ( *argv, "-r" ) == 0 ) || ( strcmp ( *argv, "--raw" ) == 0 ) ) {
-            m_configuration.raw = 1;
-        }
-        else if ( ( strcmp ( *argv, "-i" ) == 0 ) || ( strcmp ( *argv, "--invert" ) == 0 ) ) {
-            m_configuration.inv = 1;  // nicht noetig
-        }
-        else if ( ( strcmp ( *argv, "-c" ) == 0 ) || ( strcmp ( *argv, "--color" ) == 0 ) ) {
-            m_configuration.color = 1;
-        }
-        else if ( strcmp ( *argv, "--res" ) == 0 ) { m_configuration.res = 1; }
-        else if ( ( strcmp ( *argv, "--avg" ) == 0 ) ) {
-            m_configuration.avg = 1;
-        }
-        else if ( strcmp ( *argv, "-b" ) == 0 ) { m_configuration.b = 1; }
-        else if ( strcmp ( *argv, "-b2" ) == 0 ) { m_configuration.b = 2; }
-        else if ( ( strcmp ( *argv, "--ptu" ) == 0 ) ) {
-            m_configuration.ptu = 1;
-        }
-        else {
-            fp = fopen ( *argv, "rb" );
-            if ( fp == NULL ) {
-                fprintf ( stderr, "%s konnte nicht geoeffnet werden\n", *argv );
-                return -1;
-            }
-            m_configuration.wavloaded = 1;
-        }
-        ++argv;
+    // If trimble M10
+    if ( frame_bytes[1] == 0x9f )
+    {
+        print_pos ( SOT_TRIMBLE ) ;
     }
-    
-
-    pos = FRAMESTART;
-
-    while ( !read_bits_fsk ( fp, &bit, &len ) ) {
-
-        if ( len == 0 ) { // reset_frame();
-            if ( pos > ( pos_GPSweek + 2 ) * 2 * BITS ) {
-                for ( i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
-                print_frame ( pos );//byte_count
-                header_found = 0;
-                pos = FRAMESTART;
-            }
-            //inc_m_bufPos();
-            //buf[m_bufPos] = 'x';
-            continue;   // ...
-        }
-
-        for ( i = 0; i < len; i++ ) {
-
-            inc_m_bufPos ();
-            buf[m_bufPos] = 0x30 + bit;  // Ascii
-
-            if ( !header_found ) {
-                header_found = IsThisAHeader ();
-            }
-            else {
-                frame_rawbits[pos] = 0x30 + bit;  // Ascii
-                pos++;
-
-                if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                    frame_rawbits[pos] = '\0';
-                    print_frame ( pos );//FRAME_LEN
-                    header_found = 0;
-                    pos = FRAMESTART;
-                }
-            }
-
-        }
-        if ( header_found && m_configuration.b == 1 ) {
-            m_bitStart = true;
-
-            while ( pos < RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                if ( read_rawbit ( fp, &bit ) == EOF ) break;
-                frame_rawbits[pos] = 0x30 + bit;
-                pos++;
-            }
-            frame_rawbits[pos] = '\0';
-            print_frame ( pos );
-            header_found = 0;
-            pos = FRAMESTART;
-        }
-        if ( header_found && m_configuration.b >= 2 ) {
-            m_bitStart = true;
-            bit0 = 0;
-
-            if ( pos % 2 ) {
-                if ( read_rawbit ( fp, &bit ) == EOF ) break;
-                frame_rawbits[pos] = 0x30 + bit;
-                pos++;
-            }
-
-            bit0 = dpsk_bpm ( frame_rawbits, frame_bits, pos );
-            pos /= 2;
-
-            while ( pos < BITFRAME_LEN + BITAUX_LEN ) {
-                if ( read_rawbit2 ( fp, &bit ) == EOF ) break;
-                frame_bits[pos] = 0x31 ^ ( bit0 ^ bit );
-                pos++;
-                bit0 = bit;
-            }
-            frame_bits[pos] = '\0';
-            print_frame ( pos );
-            header_found = 0;
-            pos = FRAMESTART;
-        }
+    // If gtop M10
+    else if ( frame_bytes[1] == 0xaf )
+    {
+        print_pos ( SOT_GTOP ) ;
+    }
+    // Unknown, try both
+    else
+    {
+        std::cout << "Unknown M10, trying to decode using both algorithms." << std::endl ;
+        print_pos ( SOT_TRIMBLE ) ;
+        print_pos ( SOT_GTOP ) ;
     }
 
     fprintf ( stdout, "\n" );
-
-    fclose ( fp );
-
-    return 0;
 }
-*/
-

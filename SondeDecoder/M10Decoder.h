@@ -40,6 +40,11 @@ typedef enum SampleType {
     ST_INVALID
 } ;
 
+typedef enum SondeType {
+    SOT_TRIMBLE,
+    SOT_GTOP
+};
+
 #define BITS 8
 #define HEADLEN 32  // HEADLEN+HEADOFS=32 <= strlen(header)
 #define HEADOFS  0
@@ -62,7 +67,7 @@ public:
     HRESULT SetFormat ( WAVEFORMATEX *pwfx );
     HRESULT CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone );
 
-    int print_pos ( int csOK ) ;
+    int print_pos ( SondeType sondeType ) ;
 
     void print_frame ( int pos ) ;
 

@@ -7,12 +7,12 @@
 
 
 
-GPS::GPS ()
+GPSTrimble::GPSTrimble ()
 {
 }
 
 
-GPS::~GPS ()
+GPSTrimble::~GPSTrimble ()
 {
 }
 
@@ -22,7 +22,7 @@ GPS::~GPS ()
 * - Adapted from sci.astro FAQ.
 * - Ignores UTC leap seconds.
 */
-void GPS::Gps2Date ( long GpsWeek, long GpsSeconds, int *Year, int *Month, int *Day ) {
+void GPSTrimble::Gps2Date ( long GpsWeek, long GpsSeconds, int *Year, int *Month, int *Day ) {
 
     long GpsDays, Mjd;
     long J, C, Y, M;
@@ -42,7 +42,7 @@ void GPS::Gps2Date ( long GpsWeek, long GpsSeconds, int *Year, int *Month, int *
     *Year = 100 * ( C - 49 ) + Y + J;
 }
 
-int GPS::get_GPSweek ( uint8_t * frame_bytes, uint32_t posGpsWeek, Date & date ) {
+int GPSTrimble::get_GPSweek ( uint8_t * frame_bytes, uint32_t posGpsWeek, Date & date ) {
     int i;
     unsigned byte;
     uint8_t gpsweek_bytes[2];
@@ -62,7 +62,7 @@ int GPS::get_GPSweek ( uint8_t * frame_bytes, uint32_t posGpsWeek, Date & date )
 }
 
 
-int GPS::get_GPStime ( uint8_t * frame_bytes, uint32_t posGpsTow, Date & date ) {
+int GPSTrimble::get_GPStime ( uint8_t * frame_bytes, uint32_t posGpsTow, Date & date ) {
 
     int gpstime = getInt32 ( frame_bytes, posGpsTow ) ;
     //ms = gpstime % 1000;
@@ -83,23 +83,23 @@ int GPS::get_GPStime ( uint8_t * frame_bytes, uint32_t posGpsTow, Date & date ) 
 
 double B60B60 = 0xB60B60;  // 2^32/360 = 0xB60B60.xxx
 
-void GPS::get_GPSlat ( uint8_t * frame_bytes, uint32_t posGpsLat, Date & date  )
+void GPSTrimble::get_GPSlat ( uint8_t * frame_bytes, uint32_t posGpsLat, Date & date  )
 {
     date.lat = getInt32 ( frame_bytes, posGpsLat ) / B60B60;
 }
 
-void GPS::get_GPSlon ( uint8_t * frame_bytes, uint32_t posGpsLon, Date & date )
+void GPSTrimble::get_GPSlon ( uint8_t * frame_bytes, uint32_t posGpsLon, Date & date )
 {
     date.lon = getInt32 ( frame_bytes, posGpsLon ) / B60B60;
 }
 
-void GPS::get_GPSalt ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date )
+void GPSTrimble::get_GPSalt ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date )
 {
     date.alt = getInt32 ( frame_bytes, posGpsAlt ) / 1000.0;
 }
 
 int 
-GPS::get_GPSvel 
+GPSTrimble::get_GPSvel 
 ( 
     uint8_t * frame_bytes,
     uint32_t posGpsVelE,
@@ -153,7 +153,109 @@ GPS::get_GPSvel
     return 0;
 }
 
-int GPS::get_SN ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date  ) {
+int GPSTrimble::get_SN ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date  ) {
+    int i;
+    unsigned byte;
+    uint8_t sn_bytes[5];
+
+    for ( i = 0; i < 11; i++ ) date.SN[i] = ' '; date.SN[11] = '\0';
+
+    for ( i = 0; i < 5; i++ ) {
+        byte = frame_bytes[posGpsAlt + i];
+        sn_bytes[i] = byte;
+    }
+
+    byte = sn_bytes[2];
+    sprintf ( date.SN, "%1X%02u", ( byte >> 4 ) & 0xF, byte & 0xF );
+    byte = sn_bytes[3] | ( sn_bytes[4] << 8 );
+    sprintf ( date.SN + 3, " %1X %1u%04u", sn_bytes[0] & 0xF, ( byte >> 13 ) & 0x7, byte & 0x1FFF );
+
+    return 0;
+}
+
+
+
+int GPSGtop::get_GPSweek ( uint8_t * frame_bytes, uint32_t posGpsWeek, Date & date ) {
+    int i;
+    unsigned byte;
+    uint8_t gpsweek_bytes[2];
+    int gpsweek;
+
+    for ( i = 0; i < 2; i++ ) {
+        byte = frame_bytes[posGpsWeek + i];
+        gpsweek_bytes[i] = byte;
+    }
+
+    gpsweek = ( gpsweek_bytes[0] << 8 ) + gpsweek_bytes[1];
+    date.week = gpsweek;
+
+    if ( gpsweek < 0 || gpsweek > 3000 ) return -1;
+
+    return 0;
+}
+
+
+int GPSGtop::get_GPStime ( uint8_t * frame_bytes, uint32_t posGpsTow, Date & date ) {
+    int32_t time = getInt32 ( frame_bytes, posGpsTow ) ;
+    date.std = time / 10000 ;
+    date.min = ( time % 10000 ) / 100 ;
+    date.sek = time % 100 ;
+
+    return 0;
+}
+
+void GPSGtop::get_GPSlat ( uint8_t * frame_bytes, uint32_t posGpsLat, Date & date )
+{
+    date.lat = getInt32 ( frame_bytes, posGpsLat ) / 1e6;
+}
+
+void GPSGtop::get_GPSlon ( uint8_t * frame_bytes, uint32_t posGpsLon, Date & date )
+{
+    date.lon = getInt32 ( frame_bytes, posGpsLon ) / 1e6;
+}
+
+void GPSGtop::get_GPSalt ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date )
+{
+    // 24bit
+    int32_t alt = getInt32 ( frame_bytes, posGpsAlt ) ;
+    alt >>= 8 ;
+    alt = alt / 100 ;
+    if ( alt & 0x800000 )
+    {
+        alt -= 0x1000000;
+    }
+    date.alt = alt ;
+}
+
+int
+GPSGtop::get_GPSvel
+(
+    uint8_t * frame_bytes,
+    uint32_t posGpsVelE,
+    uint32_t posGpsVelN,
+    uint32_t posGpsVelU,
+    Date & date
+)
+{
+    int i;
+    unsigned byte;
+    uint8_t gpsVel_bytes[2];
+    short vel16;
+    double  dir, alpha;
+
+    date.vx = getInt16 ( frame_bytes, posGpsVelE ) / 100.0; // est
+    date.vy = getInt16 ( frame_bytes, posGpsVelN ) / 100.0; // nord
+    date.vH = sqrt ( date.vx*date.vx + date.vy*date.vy );
+
+    dir = atan2 (date.vx, date.vy ) * 180 / M_PI;
+    if ( dir < 0 ) dir += 360;
+    date.vD = dir;
+    date.vV = getInt16 ( frame_bytes, posGpsVelU ) / 1e2;
+
+    return 0;
+}
+
+int GPSGtop::get_SN ( uint8_t * frame_bytes, uint32_t posGpsAlt, Date & date ) {
     int i;
     unsigned byte;
     uint8_t sn_bytes[5];

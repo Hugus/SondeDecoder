@@ -116,7 +116,7 @@ int16_t getInt16 ( uint8_t *frame_bytes, uint32_t position )
 
     int16_t result = 0 ;
     for ( unsigned int i = 0; i < 2; i++ ) {
-        result |= outputArray[i] << ( 8 * ( 3 - i ) );
+        result |= outputArray[i] << ( 8 * ( 1 - i ) );
     }
 
     return result ;
