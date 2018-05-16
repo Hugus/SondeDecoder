@@ -197,6 +197,8 @@ int GPSGtop::get_GPSweek ( uint8_t * frame_bytes, uint32_t posGpsWeek, Date & da
 
 int GPSGtop::get_GPStime ( uint8_t * frame_bytes, uint32_t posGpsTow, Date & date ) {
     int32_t time = getInt32 ( frame_bytes, posGpsTow ) ;
+    // 24 bits
+    time >>= 8 ;
     date.std = time / 10000 ;
     date.min = ( time % 10000 ) / 100 ;
     date.sek = time % 100 ;

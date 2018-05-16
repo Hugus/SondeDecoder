@@ -36,7 +36,7 @@ M10Decoder::M10Decoder ()
     m_configuration.ptu = 1 ;
     //m_configuration.raw = 1 ;
 
-    std::cout << "SondeDecoder v1.01." << std::endl ;
+    std::cout << "SondeDecoder v1.02." << std::endl ;
 }
 
 
