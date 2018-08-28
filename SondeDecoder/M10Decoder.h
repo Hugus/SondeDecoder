@@ -1,10 +1,15 @@
 #pragma once
 
 #include "GPS.h"
-#include <Mmdeviceapi.h>
 #include <stdint.h>
 
-typedef struct Configuration_s {
+#ifdef _WIN32
+#include <Mmdeviceapi.h>
+#else
+#include <cstddef>
+#endif
+
+struct Configuration_s {
     int verbose ;  // Detailed display
     int raw ;      // Raw Frames
     int inv ;      // Inverted Signal
@@ -22,25 +27,25 @@ typedef struct Configuration_s {
         , color ( 0 )
         , ptu ( 0 )
         , wavloaded ( 0 ) {}
-} Configuration_t;
+} ;
 
-typedef struct AudioBuffer {
+struct AudioBuffer {
     uint8_t * pData ;
-    UINT32 size ;
-    UINT32 currentPosition ;
+    uint32_t size ;
+    uint32_t currentPosition ;
     AudioBuffer ()
         : pData ( NULL )
         , size ( 0 )
         , currentPosition ( 0 ) {}
 } ;
 
-typedef enum SampleType {
+enum SampleType {
     ST_INT,
     ST_FLOAT,
     ST_INVALID
 } ;
 
-typedef enum SondeType {
+enum SondeType {
     SOT_TRIMBLE,
     SOT_GTOP
 };
@@ -64,12 +69,21 @@ public:
     M10Decoder ();
     ~M10Decoder ();
 
-    HRESULT SetFormat ( WAVEFORMATEX *pwfx );
-    HRESULT CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone );
+#ifdef _WIN32
+    int SetFormat ( WAVEFORMATEX *pwfx );
+#else
+    int SetFormat ( uint64_t bitsPerSample,
+                    uint64_t samplePerSec,
+                    uint64_t nChannels,
+                    SampleType sampleType );
+#endif
+    int CopyData ( uint8_t * pData, uint32_t numFramesAvailable, bool * bDone );
 
     int print_pos ( SondeType sondeType ) ;
 
-    void print_frame ( int pos ) ;
+    void print_frame () ;
+
+    double getBaudRate() const ;
 
 
 private:
@@ -106,16 +120,16 @@ private:
     int update_checkM10 ( int c, uint8_t b ) ;
 
 private:
-    WORD m_bitsPerSample ;
-    DWORD m_samplePerSec ;
-    WORD m_nChannels ;
+    uint64_t m_bitsPerSample ;
+    uint64_t m_samplePerSec ;
+    uint64_t m_nChannels ;
 
     double m_samplePerBit ;
     double m_baudRate ;
 
     Date m_date ;
 
-    Configuration_t m_configuration ;
+    Configuration_s m_configuration ;
 
     unsigned long m_sampleCount ;
     double m_bitSeparator ;
@@ -142,7 +156,7 @@ private:
     /// Current position in header_buffer
     int m_headerBufferPos ;
 
-    int m_auxlen = 0; // 0 .. 0x76-0x64
+    int m_auxlen ; // 0 .. 0x76-0x64
 
     bool m_isHeaderFound ;
 

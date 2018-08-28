@@ -1,8 +1,8 @@
-#include "stdafx.h"
 #include "GPS.h"
 #include "Utils.h"
 #define _USE_MATH_DEFINES
 #include <cmath> 
+#include <stdio.h> 
 
 
 
@@ -239,11 +239,7 @@ GPSGtop::get_GPSvel
     Date & date
 )
 {
-    int i;
-    unsigned byte;
-    uint8_t gpsVel_bytes[2];
-    short vel16;
-    double  dir, alpha;
+    double  dir;
 
     date.vx = getInt16 ( frame_bytes, posGpsVelE ) / 100.0; // est
     date.vy = getInt16 ( frame_bytes, posGpsVelN ) / 100.0; // nord

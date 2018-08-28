@@ -1,5 +1,7 @@
-#include "stdafx.h"
 #include "Utils.h"
+#include <string.h>
+#include <stdlib.h>
+#include <iostream>
 
 #define BITS 8
 
@@ -35,7 +37,7 @@ int bits2bytes ( char *bitstr, uint8_t *bytes, unsigned int size ) {
 // PSK  (or biphase-M (or differential Manchester?))
 // after Synchronisation: 00,11->0 ; 01,10->1 (phase change)
 void psk_bpm ( char* frame_rawbits, char *frame_bits, unsigned int frame_size ) {
-    int i;
+    unsigned int i;
     char bit;
     //int err = 0;
 
@@ -141,4 +143,74 @@ float getFloat ( uint8_t *frame_bytes, uint32_t position )
     }
 
     return reinterpret_cast<float&>( result ) ;
+}
+
+int findstr(const char *buf, const char *str, int pos) {
+    int i;
+    for (i = 0; i < 4; i++) {
+        if (buf[(pos+i)%4] != str[i]) break;
+    }
+    return i;
+}
+
+int read_wav_header(FILE     * fp,
+                    double     baudRate,
+                    uint64_t * nChannels,
+                    uint64_t * bitsPerSample,
+                    uint64_t * samplePerSec,
+                    double   * samplePerBit ) {
+    char txt[4+1] = "\0\0\0\0";
+    unsigned char dat[4];
+    int byte, p=0;
+
+    if (fread(txt, 1, 4, fp) < 4) return -1;
+    if (strncmp(txt, "RIFF", 4)) return -1;
+    if (fread(txt, 1, 4, fp) < 4) return -1;
+    // pos_WAVE = 8L
+    if (fread(txt, 1, 4, fp) < 4) return -1;
+    if (strncmp(txt, "WAVE", 4)) return -1;
+    // pos_fmt = 12L
+    for ( ; ; ) {
+        if ( (byte=fgetc(fp)) == EOF ) return -1;
+        txt[p % 4] = byte;
+        p++; if (p==4) p=0;
+        if (findstr(txt, "fmt ", p) == 4) break;
+    }
+    if (fread(dat, 1, 4, fp) < 4) return -1;
+    if (fread(dat, 1, 2, fp) < 2) return -1;
+
+    if (fread(dat, 1, 2, fp) < 2) return -1;
+    *nChannels = dat[0] + (dat[1] << 8);
+
+    if (fread(dat, 1, 4, fp) < 4) return -1;
+    memcpy(&samplePerSec, dat, 4); 
+
+    if (fread(dat, 1, 4, fp) < 4) return -1;
+    if (fread(dat, 1, 2, fp) < 2) return -1;
+    //byte = dat[0] + (dat[1] << 8);
+
+    if (fread(dat, 1, 2, fp) < 2) return -1;
+    *bitsPerSample = dat[0] + (dat[1] << 8);
+
+    // pos_dat = 36L + info
+    for ( ; ; ) {
+        if ( (byte=fgetc(fp)) == EOF ) return -1;
+        txt[p % 4] = byte;
+        p++; if (p==4) p=0;
+        if (findstr(txt, "data", p) == 4) break;
+    }
+    if (fread(dat, 1, 4, fp) < 4) return -1;
+
+
+    std::cout << "sample_rate: " <<  *samplePerSec << std::endl ;
+    std::cout << "bits       : " <<  *bitsPerSample << std::endl ;
+    std::cout << "channels   : " <<  *nChannels << std::endl ;
+
+    if ((*bitsPerSample != 8) && (*bitsPerSample != 16)) return -1;
+
+    *samplePerBit = *samplePerSec/baudRate;
+
+    std::cout << "samples/bit: " << *samplePerBit << std::endl ;
+
+    return 0;
 }

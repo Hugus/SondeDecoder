@@ -1,10 +1,16 @@
-#include "stdafx.h"
 #include "M10Decoder.h"
 #include "GPS.h"
 #include "Utils.h"
 #include "ShibauraSensor.h"
-#include <Mmreg.h>
 #include <iostream>
+
+#ifdef _WIN32
+#include <Mmreg.h>
+#include "stdafx.h"
+#else
+#include <malloc.h>
+#include <string.h>
+#endif
 
 /*
 alternative demodulation: M10 problematic
@@ -44,7 +50,8 @@ M10Decoder::~M10Decoder ()
 {
 }
 
-HRESULT M10Decoder::SetFormat ( WAVEFORMATEX * pwfx )
+#ifdef _WIN32
+int M10Decoder::SetFormat ( WAVEFORMATEX * pwfx )
 {
     m_bitsPerSample = pwfx->wBitsPerSample ;
     m_samplePerSec = pwfx->nSamplesPerSec ;
@@ -88,8 +95,24 @@ HRESULT M10Decoder::SetFormat ( WAVEFORMATEX * pwfx )
     {
         throw "Nip" ;
     }
-    return NOERROR;
+    return 0;
 }
+#else
+int M10Decoder::SetFormat ( uint64_t bitsPerSample,
+                            uint64_t samplePerSec,
+                            uint64_t nChannels,
+                            SampleType sampleType )
+{
+   m_bitsPerSample = bitsPerSample ;
+   m_samplePerSec = samplePerSec ;
+   m_nChannels = nChannels ;
+   m_sampleType = sampleType ;
+   m_samplePerBit = m_samplePerSec / m_baudRate;
+   
+   return 0 ;
+}
+
+#endif
 
 
 /*
@@ -130,7 +153,7 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 #define pos_gtop_date       0x18 // 3 byte
 
 
-HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * bDone )
+int M10Decoder::CopyData ( uint8_t * pData, uint32_t numFramesAvailable, bool * /*bDone*/ )
 {
     // Increment audio buffer counter so as to bufferize 0.9s
     if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 0.9 )
@@ -138,7 +161,7 @@ HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * b
         m_audioBuffer.currentPosition = 0 ;
         // Handle buffer
 
-        float * pFloats = reinterpret_cast<float *>( m_audioBuffer.pData ) ;
+        // Unused float * pFloats = reinterpret_cast<float *>( m_audioBuffer.pData ) ;
 
         // Now handle buffer
         demodulateBuffer () ;
@@ -160,7 +183,7 @@ HRESULT M10Decoder::CopyData ( BYTE * pData, UINT32 numFramesAvailable, BOOL * b
         m_audioBuffer.currentPosition += sizeIncrement ;
     }
 
-    return NOERROR;
+    return 0;
 }
 
 void M10Decoder::demodulateBuffer ()
@@ -171,20 +194,19 @@ void M10Decoder::demodulateBuffer ()
     int bit ;
     // Number of bits read
     int len ;
-    int bit0 ;
     while ( !readBitsFsk ( &bit, &len ) ) {
 
         if ( len == 0 ) { // reset_frame();
             if ( pos > ( pos_trimble_gpsweek + 2 ) * 2 * BITS ) {
                 for ( unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
-                print_frame ( pos );//byte_count
+                print_frame ( );//byte_count
                 m_isHeaderFound = false;
                 pos = FRAMESTART;
             }
             continue;
         }
 
-        for ( unsigned int i = 0; i < len; i++ ) {
+        for ( int i = 0; i < len; i++ ) {
 
             incrementBufferIndex ();
             header_buffer[m_headerBufferPos] = 0x30 + bit;  // Ascii
@@ -198,7 +220,7 @@ void M10Decoder::demodulateBuffer ()
                 // If a full frame has been read
                 if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
                     frame_rawbits[pos] = '\0';
-                    print_frame ( pos );//FRAME_LEN
+                    print_frame ( );//FRAME_LEN
                     m_isHeaderFound = false;
                     pos = FRAMESTART;
                 }
@@ -235,11 +257,12 @@ int M10Decoder::readSignedSample
 (
 ) 
 {
-    int byte, i, s = 0;       // EOF -> 0x1000000
+    int s = 0;       // EOF -> 0x1000000
+    unsigned int i = 0 ;
 
     for ( i = 0; i < m_nChannels; i++ ) {
         // i = 0: left, mono
-        byte = m_audioBuffer.pData[m_audioBuffer.currentPosition] ;
+        // Not used int byte = m_audioBuffer.pData[m_audioBuffer.currentPosition] ;
 
         if ( m_bitsPerSample == 8 ) {
             if ( m_audioBuffer.currentPosition == m_audioBuffer.size )
@@ -528,7 +551,7 @@ int M10Decoder::print_pos ( SondeType sondeType ) {
     return err;
 }
 
-void M10Decoder::print_frame ( int pos ) {
+void M10Decoder::print_frame () {
     int i;
     uint8_t byte;
     int cs1, cs2;
@@ -588,4 +611,9 @@ void M10Decoder::print_frame ( int pos ) {
     }
 
     fprintf ( stdout, "\n" );
+}
+
+double M10Decoder::getBaudRate() const
+{
+   return m_baudRate ;
 }

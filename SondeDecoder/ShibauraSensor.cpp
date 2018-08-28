@@ -1,6 +1,6 @@
-#include "stdafx.h"
 #include "ShibauraSensor.h"
-#include "math.h"
+#include <math.h>
+#include <stdio.h>
 
 
 ShibauraSensor::ShibauraSensor ()
@@ -55,7 +55,7 @@ float ShibauraSensor::get_Temp ( uint8_t * frame_bytes, int verbose ) {
 
     uint8_t  scT;     // {0,1,2}, range/scale voltage divider
     uint16_t ADC_RT;  // ADC12 P6.7(A7) , adr_0377h,adr_0376h
-    uint16_t Tcal[2]; // adr_1000h[scT*4]
+    // Unused uint16_t Tcal[2]; // adr_1000h[scT*4]
 
     float adc_max = 4095.0; // ADC12
     float x, R;
@@ -64,8 +64,8 @@ float ShibauraSensor::get_Temp ( uint8_t * frame_bytes, int verbose ) {
     scT = frame_bytes[0x3E]; // adr_0455h
     ADC_RT = ( frame_bytes[0x40] << 8 ) | frame_bytes[0x3F];
     ADC_RT -= 0xA000;
-    Tcal[0] = ( frame_bytes[0x42] << 8 ) | frame_bytes[0x41];
-    Tcal[1] = ( frame_bytes[0x44] << 8 ) | frame_bytes[0x43];
+    // Unused Tcal[0] = ( frame_bytes[0x42] << 8 ) | frame_bytes[0x41];
+    // Unused Tcal[1] = ( frame_bytes[0x44] << 8 ) | frame_bytes[0x43];
 
     x = ( adc_max - ADC_RT ) / ADC_RT;  // (Vcc-Vout)/Vout
     if ( scT < 3 ) R = Rs[scT] / ( x - Rs[scT] / Rp[scT] );
