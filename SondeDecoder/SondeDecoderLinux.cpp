@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <iostream>
 
-
 int main( int argc, char ** argv ) {
 
     FILE *fp = stdin;
@@ -36,17 +35,14 @@ int main( int argc, char ** argv ) {
                           nChannels,
                           sampleType ) ;
 
-   int byte = fgetc( fp ) ;
+   int byte = 42 ;
 
    while ( byte != EOF )
    {
       int sample = 0 ; 
       for (uint64_t i = 0; i < nChannels; i++) {
-          if (i != 0)
-          {
-             continue ;
-          }
-          sample = byte;
+          byte = fgetc( fp ) ;
+          if (i==0) sample = byte;
 
           if (bitsPerSample == 16) {
               byte = fgetc(fp);
@@ -54,7 +50,7 @@ int main( int argc, char ** argv ) {
               {
                   break ;
               }
-              sample +=  byte << 8;
+              if (i==0) sample +=  byte << 8;
           }
 
       }
@@ -63,9 +59,8 @@ int main( int argc, char ** argv ) {
       if (bitsPerSample ==  8)  s = sample-128;   // 8bit: 00..FF, centerpoint 0x80=128
       if (bitsPerSample == 16)  s = (short)sample;
 
-      m10Decoder.CopyData( reinterpret_cast< uint8_t *>( s ), 1, NULL ) ;
+      m10Decoder.CopyData( reinterpret_cast< uint8_t *>( &s ), 1, NULL ) ;
 
-      byte = fgetc( fp ) ;
    }
 
    return 0 ;

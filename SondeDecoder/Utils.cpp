@@ -183,7 +183,10 @@ int read_wav_header(FILE     * fp,
     *nChannels = dat[0] + (dat[1] << 8);
 
     if (fread(dat, 1, 4, fp) < 4) return -1;
-    memcpy(&samplePerSec, dat, 4); 
+    
+    int sampleRate = 0 ;
+    memcpy(&sampleRate, dat, 4); 
+    *samplePerSec = sampleRate ;
 
     if (fread(dat, 1, 4, fp) < 4) return -1;
     if (fread(dat, 1, 2, fp) < 2) return -1;

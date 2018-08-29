@@ -156,6 +156,17 @@ dduudduudduudduu duduudduuduudduu  ddududuudduduudd uduuddududududud uudduduuddu
 int M10Decoder::CopyData ( uint8_t * pData, uint32_t numFramesAvailable, bool * /*bDone*/ )
 {
     // Increment audio buffer counter so as to bufferize 0.9s
+    {
+        // Buffer current buffer
+        // Realloc data buffer
+        uint32_t sizeIncrement = numFramesAvailable * m_bitsPerSample / 8 * m_nChannels ;
+        m_audioBuffer.size += sizeIncrement ;
+        m_audioBuffer.pData = (uint8_t*) realloc ( m_audioBuffer.pData, m_audioBuffer.size ) ;
+        // Copy audio data
+        memcpy ( m_audioBuffer.pData + m_audioBuffer.currentPosition, pData, sizeIncrement ) ;
+        // Update current position
+        m_audioBuffer.currentPosition += sizeIncrement ;
+    }
     if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 0.9 )
     {
         m_audioBuffer.currentPosition = 0 ;
@@ -169,18 +180,6 @@ int M10Decoder::CopyData ( uint8_t * pData, uint32_t numFramesAvailable, bool * 
         // Reset audio buffer
         m_audioBuffer.currentPosition = 0 ;
         m_audioBuffer.size = 0 ;
-    }
-    else
-    {
-        // Buffer current buffer
-        // Realloc data buffer
-        uint32_t sizeIncrement = numFramesAvailable * m_bitsPerSample / 8 * m_nChannels ;
-        m_audioBuffer.size += sizeIncrement ;
-        m_audioBuffer.pData = (uint8_t*) realloc ( m_audioBuffer.pData, m_audioBuffer.size ) ;
-        // Copy audio data
-        memcpy ( m_audioBuffer.pData + m_audioBuffer.currentPosition, pData, sizeIncrement ) ;
-        // Update current position
-        m_audioBuffer.currentPosition += sizeIncrement ;
     }
 
     return 0;
