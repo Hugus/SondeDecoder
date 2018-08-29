@@ -39,6 +39,13 @@ struct AudioBuffer {
         , currentPosition ( 0 ) {}
 } ;
 
+struct DemodulatorState {
+    // Position in frame buffer
+    int pos ;
+    // Number of samples of the same sign
+    int sampleCounter ;
+} ;
+
 enum SampleType {
     ST_INT,
     ST_FLOAT,
@@ -161,5 +168,7 @@ private:
     bool m_isHeaderFound ;
 
     SampleType m_sampleType ;
+
+    DemodulatorState m_demodulatorState ;
 };
 

@@ -41,6 +41,8 @@ M10Decoder::M10Decoder ()
     m_configuration.verbose = 1 ;
     m_configuration.ptu = 1 ;
     //m_configuration.raw = 1 ;
+    m_demodulatorState.pos = FRAMESTART ;
+    m_demodulatorState.sampleCounter = 0 ;
 
     std::cout << "SondeDecoder v1.02." << std::endl ;
 }
@@ -167,7 +169,7 @@ int M10Decoder::CopyData ( uint8_t * pData, uint32_t numFramesAvailable, bool * 
         // Update current position
         m_audioBuffer.currentPosition += sizeIncrement ;
     }
-    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 0.9 )
+    if ( ( m_audioBuffer.currentPosition * 8.0 / m_bitsPerSample / m_samplePerSec / m_nChannels ) > 0.1 )
     {
         m_audioBuffer.currentPosition = 0 ;
         // Handle buffer
@@ -188,7 +190,7 @@ int M10Decoder::CopyData ( uint8_t * pData, uint32_t numFramesAvailable, bool * 
 void M10Decoder::demodulateBuffer ()
 {
     // Position in frame_rawbits buffer
-    int pos = FRAMESTART ;
+    // m_demodulatorState.pos
     // Current bit
     int bit ;
     // Number of bits read
@@ -196,11 +198,11 @@ void M10Decoder::demodulateBuffer ()
     while ( !readBitsFsk ( &bit, &len ) ) {
 
         if ( len == 0 ) { // reset_frame();
-            if ( pos > ( pos_trimble_gpsweek + 2 ) * 2 * BITS ) {
-                for ( unsigned int i = pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
+            if ( m_demodulatorState.pos > ( pos_trimble_gpsweek + 2 ) * 2 * BITS ) {
+                for ( unsigned int i = m_demodulatorState.pos; i < RAWBITFRAME_LEN + RAWBITAUX_LEN; i++ ) frame_rawbits[i] = 0x30 + 0;
                 print_frame ( );//byte_count
                 m_isHeaderFound = false;
-                pos = FRAMESTART;
+                m_demodulatorState.pos = FRAMESTART;
             }
             continue;
         }
@@ -214,14 +216,14 @@ void M10Decoder::demodulateBuffer ()
                 m_isHeaderFound = IsThisAHeader ();
             }
             else {
-                frame_rawbits[pos] = 0x30 + bit;  // Ascii
-                pos++;
+                frame_rawbits[m_demodulatorState.pos] = 0x30 + bit;  // Ascii
+                m_demodulatorState.pos++;
                 // If a full frame has been read
-                if ( pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
-                    frame_rawbits[pos] = '\0';
+                if ( m_demodulatorState.pos == RAWBITFRAME_LEN + RAWBITAUX_LEN ) {
+                    frame_rawbits[m_demodulatorState.pos] = '\0';
                     print_frame ( );//FRAME_LEN
                     m_isHeaderFound = false;
-                    pos = FRAMESTART;
+                    m_demodulatorState.pos = FRAMESTART;
                 }
             }
 
@@ -309,27 +311,30 @@ int M10Decoder::readSignedSample
 int M10Decoder::readBitsFsk ( int *bit, int *len ) {
     // TODO why static int sample ?
     int sample = 0;
-    int n, y0;
-    float l, x1;
-    static float x0;
+    // int n = 0;
+    float l;
+    // float x1, y0;
+    //static float x0;
 
-    n = 0;
     do {
-        y0 = sample;
+        //y0 = sample;
         sample = readSignedSample ();
         if ( sample == EOF_INT ) return EOF;
 
         m_parAlt = m_par;
         m_par = ( sample >= 0 ) ? 1 : -1;    // 8bit: 0..127,128..255 (-128..-1,0..127)
-        n++;
+        m_demodulatorState.sampleCounter++;
     } while ( m_par*m_parAlt > 0 );
 
-    if ( !m_configuration.res ) l = (float)n / m_samplePerBit;
-    else {                                       // more accurate bit length measurement
-        x1 = sample / (float)( sample - y0 );    // helps with low sample rate
-        l = ( n + x0 - x1 ) / m_samplePerBit;    // usually more frames (not always)
-        x0 = x1;
-    }
+    //if ( !m_configuration.res ) 
+    //{
+        l = (float)m_demodulatorState.sampleCounter / m_samplePerBit;
+    //}
+    //else {                                       // more accurate bit length measurement
+    //    x1 = sample / (float)( sample - y0 );    // helps with low sample rate
+    //    l = ( m_demodulatorState.sampleCounter + x0 - x1 ) / m_samplePerBit;    // usually more frames (not always)
+    //    x0 = x1;
+    //}
 
     *len = (int)( l + 0.5 );
 
@@ -338,6 +343,7 @@ int M10Decoder::readBitsFsk ( int *bit, int *len ) {
                                                   // *bit = (1+inv*m_parAlt)/2; // except inv=0
 
                                                   /* Y-offset ? */
+    m_demodulatorState.sampleCounter = 0 ;
     return 0;
 }
 
