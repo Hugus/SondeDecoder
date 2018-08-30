@@ -32,7 +32,7 @@ int main( int argc, char ** argv ) {
 
     m10Decoder.SetFormat( bitsPerSample,
                           samplePerSec,
-                          nChannels,
+                          1,
                           sampleType ) ;
 
    int byte = 42 ;

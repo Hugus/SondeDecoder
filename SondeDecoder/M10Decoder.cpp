@@ -254,6 +254,7 @@ typedef unsigned int   ui32_t;
 
 #define EOF_INT  0x1000000
 
+
 int M10Decoder::readSignedSample
 (
 ) 
@@ -270,7 +271,7 @@ int M10Decoder::readSignedSample
             {
                 return EOF_INT;
             }
-            s = getUInt8 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) - 128 ; // 8bit: 00..FF, centerpoint 0x80=128
+            if (i ==0) s = getUInt8 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) - 128 ; // 8bit: 00..FF, centerpoint 0x80=128
             m_audioBuffer.currentPosition += 1 ;
         }
         else if ( m_bitsPerSample == 16 ) {
@@ -278,7 +279,7 @@ int M10Decoder::readSignedSample
             {
                 return EOF_INT;
             }
-            s = getInt16 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) ;// -32768 ; // minus 2^15
+            if (i==0)s = getInt16 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) ;// -32768 ; // minus 2^15
             m_audioBuffer.currentPosition += 2 ;
         } 
         else if ( m_bitsPerSample == 32 ) 
@@ -290,12 +291,12 @@ int M10Decoder::readSignedSample
             if ( m_sampleType == ST_FLOAT )
             {
                 float f = *reinterpret_cast<float *>( m_audioBuffer.pData + m_audioBuffer.currentPosition ) ;
-                s = f * 1000;
+                if (i ==0) s = f * 1000;
                 m_audioBuffer.currentPosition += 4 ;
             }
             else
             {
-                s = getInt32 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) ;// -pow ( 2, 22 ) ;// minus 2^22
+                if (i ==0) s = getInt32 ( m_audioBuffer.pData, m_audioBuffer.currentPosition ) ;// -pow ( 2, 22 ) ;// minus 2^22
                 m_audioBuffer.currentPosition += 4 ;
             }
         }
@@ -304,7 +305,6 @@ int M10Decoder::readSignedSample
             throw "Nope" ;
         }
     }
-    //std::cout << s << std::endl;
     return s;
 }
 
