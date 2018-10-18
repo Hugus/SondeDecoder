@@ -124,11 +124,28 @@ int16_t getInt16 ( uint8_t *frame_bytes, uint32_t position )
     return result ;
 }
 
+int16_t getInt16Endian ( uint8_t *frame_bytes, uint32_t position )
+{
+
+    uint8_t outputArray[2];
+    for ( unsigned int i = 0; i < 2; i++ ) {
+        outputArray[i] = frame_bytes[position + i];;
+    }
+
+    int16_t result = 0 ;
+    for ( unsigned int i = 0; i < 2; i++ ) {
+        result |= outputArray[i] << ( 8 * (  1 - i ) );
+    }
+
+    return result ;
+}
+
 uint8_t getUInt8 ( uint8_t *frame_bytes, uint32_t position )
 {
     return frame_bytes[position] ;
 }
 
+#include <assert.h>
 float getFloat ( uint8_t *frame_bytes, uint32_t position )
 {
 
@@ -142,7 +159,8 @@ float getFloat ( uint8_t *frame_bytes, uint32_t position )
         result |= outputArray[i] << ( 8 * (3 - i ) );
     }
 
-    return reinterpret_cast<float&>( result ) ;
+assert(0) ;
+    return 1.f ;
 }
 
 int findstr(const char *buf, const char *str, int pos) {

@@ -241,14 +241,14 @@ GPSGtop::get_GPSvel
 {
     double  dir;
 
-    date.vx = getInt16 ( frame_bytes, posGpsVelE ) / 100.0; // est
-    date.vy = getInt16 ( frame_bytes, posGpsVelN ) / 100.0; // nord
+    date.vx = getInt16Endian ( frame_bytes, posGpsVelE ) / 100.0; // est
+    date.vy = getInt16Endian ( frame_bytes, posGpsVelN ) / 100.0; // nord
     date.vH = sqrt ( date.vx*date.vx + date.vy*date.vy );
 
     dir = atan2 (date.vx, date.vy ) * 180 / M_PI;
     if ( dir < 0 ) dir += 360;
     date.vD = dir;
-    date.vV = getInt16 ( frame_bytes, posGpsVelU ) / 1e2;
+    date.vV = getInt16Endian ( frame_bytes, posGpsVelU ) / 1e2;
 
     return 0;
 }
